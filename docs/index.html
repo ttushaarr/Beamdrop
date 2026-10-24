@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BeamDrop — Open-Source AirDrop & KDE Connect for macOS and Android</title>
+    <meta name="description" content="Lightning-fast local Wi-Fi file drops, live bidirectional clipboard sync, remote trackpad & keyboard, media controls, and system automations between Mac and Android. 100% private, zero cloud.">
+    
+    <!-- Open Graph / Meta -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="BeamDrop — AirDrop & KDE Connect for macOS and Android">
+    <meta property="og:description" content="Local Wi-Fi file transfers, live clipboard sync, remote trackpad, media remote & system automations. 100% local, zero cloud dependencies.">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        },
+                        dark: {
+                            900: '#0B0F19',
+                            800: '#111827',
+                            700: '#1F2937',
+                            600: '#374151',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glow-blue {
+            box-shadow: 0 0 50px -10px rgba(59, 130, 246, 0.3);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 50%, #F472B6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .gradient-border {
+            border-image: linear-gradient(to bottom right, rgba(96, 165, 250, 0.4), rgba(167, 139, 250, 0.1)) 1;
+        }
+    </style>
+</head>
+<body class="bg-dark-900 text-gray-100 font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- Ambient Gradient Blobs -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+        <div class="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/20 rounded-full blur-[128px]"></div>
+        <div class="absolute top-1/3 -right-40 w-96 h-96 bg-purple-600/15 rounded-full blur-[128px]"></div>
+        <div class="absolute -bottom-40 left-1/3 w-96 h-96 bg-cyan-600/15 rounded-full blur-[128px]"></div>
+    </div>
+
+    <!-- Navigation Header -->
+    <header class="sticky top-0 z-50 glass-panel border-b border-gray-800/80">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="#" class="flex items-center gap-3 group">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                    <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="font-extrabold text-xl tracking-tight text-white">BeamDrop</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono font-medium">v1.2</span>
+                </div>
+            </a>
+
+            <!-- Nav Links -->
+            <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
+                <a href="#features" class="hover:text-white transition-colors">Features</a>
+                <a href="#kde-connect" class="hover:text-white transition-colors">KDE Connect</a>
+                <a href="#architecture" class="hover:text-white transition-colors">Architecture</a>
+                <a href="#download" class="hover:text-white transition-colors">Download</a>
+                <a href="#faq" class="hover:text-white transition-colors">FAQ</a>
+            </nav>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-3">
+                <a href="https://github.com/your-username/beamdrop" target="_blank" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 border border-gray-700/60 transition-all">
+                    <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                    <span class="text-xs px-1.5 py-0.2 bg-gray-700/80 rounded text-gray-400">★ Star</span>
+                </a>
+                <a href="#download" class="hidden sm:inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-blue-600/30 transition-all">
+                    <span>Get BeamDrop</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="relative pt-20 pb-28 px-6 overflow-hidden">
+        <div class="max-w-5xl mx-auto text-center">
+            
+            <!-- Open Source Pill -->
+            <div class="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold mb-8 backdrop-blur-md">
+                <span class="flex h-2 w-2 rounded-full bg-blue-400 animate-pulse"></span>
+                <span>100% Open Source • Local Wi-Fi • Zero Cloud Dependencies</span>
+            </div>
+
+            <!-- Headline -->
+            <h1 class="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1] mb-6">
+                AirDrop & KDE Connect <br class="hidden sm:block">
+                <span class="gradient-text">for macOS & Android.</span>
+            </h1>
+
+            <!-- Subtitle -->
+            <p class="max-w-2xl mx-auto text-base sm:text-lg text-gray-400 mb-10 leading-relaxed font-normal">
+                Seamless local file drops, live bidirectional clipboard synchronization, remote touchpad gestures, presentation clicker, media player remote, and system automations. Fast, beautiful, and completely offline.
+            </p>
+
+            <!-- CTA Buttons -->
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+                <a href="#download" class="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl text-sm font-bold bg-white text-gray-950 hover:bg-gray-100 shadow-xl shadow-white/10 transition-all transform hover:-translate-y-0.5">
+                    <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.61-.75 1.04-1.8 0.92-2.85-.9.04-2 .6-2.65 1.35-.56.64-.98 1.7-0.87 2.72 1 .08 1.99-.47 2.6-1.22z"></path>
+                    </svg>
+                    <span>Download for macOS</span>
+                    <span class="text-xs px-1.5 py-0.5 bg-gray-200 text-gray-800 rounded font-mono font-medium">Apple Silicon</span>
+                </a>
+                <a href="#download" class="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl text-sm font-bold glass-panel text-gray-200 hover:text-white hover:bg-gray-800/80 border border-gray-700/80 transition-all transform hover:-translate-y-0.5">
+                    <svg class="w-5 h-5 fill-current text-green-400" viewBox="0 0 24 24">
+                        <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.551 0 .9993.4482.9993.9993.0001.5511-.4483.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.4116 13.8533 8.106 12 8.106c-1.8533 0-3.5902.3056-5.1368.8437L4.8409 5.4467a.4161.4161 0 00-.5677-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396"></path>
+                    </svg>
+                    <span>Download Android APK</span>
+                    <span class="text-xs px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded font-mono font-medium">v1.2</span>
+                </a>
+            </div>
+
+            <!-- Terminal Clone Command -->
+            <div class="inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-gray-900/90 border border-gray-800 text-xs font-mono text-gray-400">
+                <span class="text-green-400">$</span>
+                <span>git clone https://github.com/your-username/beamdrop.git</span>
+                <button onclick="navigator.clipboard.writeText('git clone https://github.com/your-username/beamdrop.git'); this.innerText='Copied!';" class="ml-2 text-gray-400 hover:text-white px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 transition">Copy</button>
+            </div>
+        </div>
+
+        <!-- Interactive Live Showcase Mockup -->
+        <div class="max-w-5xl mx-auto mt-14 glass-panel rounded-2xl p-4 sm:p-6 glow-blue border border-gray-700/60 shadow-2xl">
+            <!-- Mockup Header Controls -->
+            <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-gray-800 text-xs">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-red-500/80 inline-block"></span>
+                    <span class="w-3 h-3 rounded-full bg-yellow-500/80 inline-block"></span>
+                    <span class="w-3 h-3 rounded-full bg-green-500/80 inline-block"></span>
+                    <span class="ml-2 font-mono text-gray-400">BeamDrop Sync Engine • Local Wi-Fi (192.168.1.x)</span>
+                </div>
+                
+                <!-- Interactive Tabs -->
+                <div class="flex items-center gap-1 bg-gray-900/80 p-1 rounded-lg border border-gray-800 overflow-x-auto" id="showcase-tabs">
+                    <button onclick="switchTab('transfer')" class="tab-btn px-3 py-1 rounded text-xs font-semibold bg-brand-600 text-white" data-tab="transfer">⚡ File Drop</button>
+                    <button onclick="switchTab('clipboard')" class="tab-btn px-3 py-1 rounded text-xs font-semibold text-gray-400 hover:text-white" data-tab="clipboard">📋 Clipboard</button>
+                    <button onclick="switchTab('trackpad')" class="tab-btn px-3 py-1 rounded text-xs font-semibold text-gray-400 hover:text-white" data-tab="trackpad">🖱️ Trackpad</button>
+                    <button onclick="switchTab('media')" class="tab-btn px-3 py-1 rounded text-xs font-semibold text-gray-400 hover:text-white" data-tab="media">🎵 Media</button>
+                    <button onclick="switchTab('commands')" class="tab-btn px-3 py-1 rounded text-xs font-semibold text-gray-400 hover:text-white" data-tab="commands">⚙️ Commands</button>
+                    <button onclick="switchTab('battery')" class="tab-btn px-3 py-1 rounded text-xs font-semibold text-gray-400 hover:text-white" data-tab="battery">🔋 Battery</button>
+                </div>
+            </div>
+
+            <!-- Tab Content Previews -->
+            <div class="py-6 min-h-[300px] flex items-center justify-center">
+                
+                <!-- Tab: File Drop -->
+                <div id="tab-transfer" class="w-full flex flex-col md:flex-row items-center gap-8 justify-between p-4">
+                    <div class="flex-1 space-y-4">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
+                            ✓ Zero-Confirmation MediaStore Auto-Routing
+                        </div>
+                        <h3 class="text-2xl font-bold">Drop files on Mac. Find them organized on Tablet.</h3>
+                        <p class="text-gray-400 text-sm leading-relaxed">
+                            Photos save to <code class="text-blue-300 font-mono">Pictures/</code> with instant gallery indexing. Videos route to <code class="text-blue-300 font-mono">Movies/</code>, and documents go straight to <code class="text-blue-300 font-mono">Download/</code>. No file pickers or tap confirms needed.
+                        </p>
+                        <div class="flex items-center gap-6 pt-2 font-mono text-xs text-gray-400">
+                            <div><span class="text-white font-bold">~60–90 MB/s</span> Wi-Fi Speed</div>
+                            <div><span class="text-white font-bold">SHA-256</span> Checksum Verified</div>
+                        </div>
+                    </div>
+                    <div class="w-full md:w-80 p-5 rounded-xl bg-gray-900/90 border border-gray-800 shadow-xl space-y-3">
+                        <div class="flex items-center justify-between text-xs text-gray-400 pb-2 border-b border-gray-800">
+                            <span>Drop Zone (MacBook)</span>
+                            <span class="text-emerald-400">Ready</span>
+                        </div>
+                        <div class="border-2 border-dashed border-blue-500/40 rounded-lg p-6 text-center bg-blue-500/5">
+                            <div class="w-10 h-10 mx-auto rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 mb-2">
+                                📄
+                            </div>
+                            <div class="text-xs font-semibold text-white">4K_Drone_Footage.mp4</div>
+                            <div class="text-[11px] text-gray-400 mt-1">1.82 GB • 100% Transfer Complete</div>
+                            <div class="w-full bg-gray-800 rounded-full h-1.5 mt-3 overflow-hidden">
+                                <div class="bg-gradient-to-r from-blue-500 to-cyan-400 h-1.5 rounded-full w-full"></div>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-gray-500 text-center font-mono">Saved to Moto Pad 60 Pro: Movies/</div>
+                    </div>
+                </div>
+
+                <!-- Tab: Clipboard -->
+                <div id="tab-clipboard" class="hidden w-full flex flex-col md:flex-row items-center gap-8 justify-between p-4">
+                    <div class="flex-1 space-y-4">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-semibold">
+                            🔄 Bidirectional Live Pasteboard Streaming
+                        </div>
+                        <h3 class="text-2xl font-bold">Copy on Mac. Paste on Tablet. Instantly.</h3>
+                        <p class="text-gray-400 text-sm leading-relaxed">
+                            Structured Server-Sent Events (SSE) stream your clipboard across devices sub-10ms without hitting any external servers. Links, OTP codes, code snippets, and text sync automatically.
+                        </p>
+                    </div>
+                    <div class="w-full md:w-80 p-5 rounded-xl bg-gray-900/90 border border-gray-800 shadow-xl space-y-3">
+                        <div class="text-xs font-semibold text-gray-400">Recent Pasteboard Sync</div>
+                        <div class="p-3 rounded-lg bg-gray-800/60 border border-gray-700/60 font-mono text-xs text-blue-300">
+                            "https://github.com/your-username/beamdrop"
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] text-gray-400">
+                            <span>Synced: Mac → Moto Pad</span>
+                            <span class="text-green-400">✓ Auto-Pasted</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Trackpad -->
+                <div id="tab-trackpad" class="hidden w-full flex flex-col md:flex-row items-center gap-8 justify-between p-4">
+                    <div class="flex-1 space-y-4">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-xs font-semibold">
+                            🖱️ Wireless Touchpad & Soft Keyboard
+                        </div>
+                        <h3 class="text-2xl font-bold">Turn your Android tablet into a fluid Mac trackpad.</h3>
+                        <p class="text-gray-400 text-sm leading-relaxed">
+                            Includes multi-touch drag cursor motion, tap to click, two-finger/long-press right click, side scroll strip, and keyboard drawer with modifier keys.
+                        </p>
+                    </div>
+                    <div class="w-full md:w-80 p-5 rounded-xl bg-gray-900/90 border border-gray-800 shadow-xl text-center space-y-3">
+                        <div class="h-32 rounded-lg bg-gray-800/40 border border-dashed border-gray-700 flex flex-col items-center justify-center text-gray-400">
+                            <span class="text-2xl mb-1">👆</span>
+                            <span class="text-xs">Touchpad Surface Active</span>
+                            <span class="text-[10px] text-gray-500">Tap: Left Click • Hold: Right Click</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Media -->
+                <div id="tab-media" class="hidden w-full flex flex-col md:flex-row items-center gap-8 justify-between p-4">
+                    <div class="flex-1 space-y-4">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 text-pink-400 border border-pink-500/20 text-xs font-semibold">
+                            🎵 MPRIS Media Controller
+                        </div>
+                        <h3 class="text-2xl font-bold">Control Spotify, Apple Music & Mac Volume remotely.</h3>
+                        <p class="text-gray-400 text-sm leading-relaxed">
+                            Play, pause, skip tracks, and adjust your Mac's master output volume right from your couch or desk without reaching for the keyboard.
+                        </p>
+                    </div>
+                    <div class="w-full md:w-80 p-5 rounded-xl bg-gray-900/90 border border-gray-800 shadow-xl space-y-4">
+                        <div class="flex items-center justify-center gap-4 text-xl">
+                            <button class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700">⏮</button>
+                            <button class="p-3 rounded-full bg-blue-600 hover:bg-blue-500 text-white">⏯</button>
+                            <button class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700">⏭</button>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-gray-400">
+                                <span>Master Volume</span>
+                                <span>78%</span>
+                            </div>
+                            <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                                <div class="bg-blue-500 h-1.5 rounded-full w-[78%]"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Commands -->
+                <div id="tab-commands" class="hidden w-full flex flex-col md:flex-row items-center gap-8 justify-between p-4">
+                    <div class="flex-1 space-y-4">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-semibold">
+                            ⚙️ One-Tap macOS Automations
+                        </div>
+                        <h3 class="text-2xl font-bold">Trigger lock, sleep, screenshots, or open web links.</h3>
+                        <p class="text-gray-400 text-sm leading-relaxed">
+                            Lock your screen when stepping away, put your Mac to sleep, trigger clean desktop screenshots, launch Terminal, or send URLs to open instantly in Safari or Chrome.
+                        </p>
+                    </div>
+                    <div class="w-full md:w-80 grid grid-cols-2 gap-2 text-xs">
+                        <div class="p-3 rounded-lg bg-gray-900 border border-gray-800 text-center font-medium">🔒 Lock Screen</div>
+                        <div class="p-3 rounded-lg bg-gray-900 border border-gray-800 text-center font-medium">📸 Screenshot</div>
+                        <div class="p-3 rounded-lg bg-gray-900 border border-gray-800 text-center font-medium">💤 Sleep Mac</div>
+                        <div class="p-3 rounded-lg bg-gray-900 border border-gray-800 text-center font-medium">🔔 Ring Device</div>
+                    </div>
+                </div>
+
+                <!-- Tab: Battery -->
+                <div id="tab-battery" class="hidden w-full flex flex-col md:flex-row items-center gap-8 justify-between p-4">
+                    <div class="flex-1 space-y-4">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
+                            🔋 Real-Time Bidirectional Power Monitor
+                        </div>
+                        <h3 class="text-2xl font-bold">Always know your battery status on both devices.</h3>
+                        <p class="text-gray-400 text-sm leading-relaxed">
+                            MacBook and Moto Pad broadcast battery levels and charging states across Wi-Fi. Check your tablet's charge from your Mac menu bar, or see your Mac's battery right on your tablet.
+                        </p>
+                    </div>
+                    <div class="w-full md:w-80 grid grid-cols-2 gap-3 text-xs">
+                        <div class="p-4 rounded-xl bg-gray-900 border border-gray-800">
+                            <div class="text-gray-400 text-[11px]">MacBook Pro</div>
+                            <div class="text-2xl font-extrabold text-white mt-1">85%</div>
+                            <div class="text-green-400 text-[11px] mt-0.5">⚡ Charging</div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-gray-900 border border-gray-800">
+                            <div class="text-gray-400 text-[11px]">Moto Pad 60 Pro</div>
+                            <div class="text-2xl font-extrabold text-white mt-1">79%</div>
+                            <div class="text-gray-400 text-[11px] mt-0.5">On Battery</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Key Features Grid -->
+    <section id="features" class="py-24 px-6 border-t border-gray-800/80 bg-dark-800/40">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center max-w-2xl mx-auto mb-16">
+                <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">
+                    Engineered for daily productivity.
+                </h2>
+                <p class="text-gray-400 text-sm sm:text-base">
+                    Everything you love about Apple AirDrop and KDE Connect, unified into a clean, modern native stack.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <!-- Card 1 -->
+                <div class="glass-panel p-6 rounded-2xl border border-gray-800 hover:border-gray-700 transition">
+                    <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-4">
+                        📁
+                    </div>
+                    <h3 class="text-lg font-bold mb-2">Zero-Click Routing</h3>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        Photos automatically index in Gallery (<code class="text-gray-300">Pictures/</code>), videos show up in Video Players (<code class="text-gray-300">Movies/</code>), and documents go directly to <code class="text-gray-300">Download/</code>.
+                    </p>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="glass-panel p-6 rounded-2xl border border-gray-800 hover:border-gray-700 transition">
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-4">
+                        📋
+                    </div>
+                    <h3 class="text-lg font-bold mb-2">Live Clipboard Sync</h3>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        Copy text on your Mac and immediately paste it on your tablet. Copy an OTP code on your phone and press Cmd+V on your Mac.
+                    </p>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="glass-panel p-6 rounded-2xl border border-gray-800 hover:border-gray-700 transition">
+                    <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-4">
+                        🖱️
+                    </div>
+                    <h3 class="text-lg font-bold mb-2">Remote Input & Gestures</h3>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        Full trackpad cursor movement with tap-to-click, double click, right click, scroll strip, and keyboard text entry into any Mac window.
+                    </p>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="glass-panel p-6 rounded-2xl border border-gray-800 hover:border-gray-700 transition">
+                    <div class="w-10 h-10 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400 mb-4">
+                        🖥️
+                    </div>
+                    <h3 class="text-lg font-bold mb-2">Presentation Clicker</h3>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        Slide control with large forward/backward tap buttons, presentation timer, F5 full-screen start, and B blackout key for keynote lectures.
+                    </p>
+                </div>
+
+                <!-- Card 5 -->
+                <div class="glass-panel p-6 rounded-2xl border border-gray-800 hover:border-gray-700 transition">
+                    <div class="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-4">
+                        🔔
+                    </div>
+                    <h3 class="text-lg font-bold mb-2">Find My Device Ring</h3>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        Ring your tablet from your Mac with a loud alarm sound and vibration even when set to silent, or ring your Mac loudly from your tablet.
+                    </p>
+                </div>
+
+                <!-- Card 6 -->
+                <div class="glass-panel p-6 rounded-2xl border border-gray-800 hover:border-gray-700 transition">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
+                        🛡️
+                    </div>
+                    <h3 class="text-lg font-bold mb-2">100% Offline & Private</h3>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        No cloud relays, no tracking, and no external internet required. Direct peer-to-peer TCP on your local router with SHA-256 tokens.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture / Protocol Section -->
+    <section id="architecture" class="py-24 px-6 border-t border-gray-800/80">
+        <div class="max-w-5xl mx-auto">
+            <div class="text-center max-w-2xl mx-auto mb-16">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-semibold mb-4">
+                    Open Protocol Specification
+                </div>
+                <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">
+                    How BeamDrop Works
+                </h2>
+                <p class="text-gray-400 text-sm">
+                    A clean, lightweight HTTP/REST and Server-Sent Events (SSE) protocol with zero third-party cloud intermediaries.
+                </p>
+            </div>
+
+            <div class="glass-panel p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                    <div class="p-5 rounded-xl bg-gray-900/90 border border-gray-800 space-y-3">
+                        <div class="flex items-center gap-2 font-bold text-white">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span>
+                            <span>macOS Native Stack</span>
+                        </div>
+                        <ul class="text-xs text-gray-400 space-y-2 font-mono">
+                            <li>• Swift 5.9+ & SwiftUI architecture</li>
+                            <li>• Native <code class="text-blue-300">CGEvent</code> synthetic input dispatch</li>
+                            <li>• Modern async/await <code class="text-blue-300">URLSession.bytes</code> SSE streaming</li>
+                            <li>• <code class="text-blue-300">IOKit.ps</code> power source battery monitoring</li>
+                            <li>• Native macOS Notification Center integration</li>
+                        </ul>
+                    </div>
+
+                    <div class="p-5 rounded-xl bg-gray-900/90 border border-gray-800 space-y-3">
+                        <div class="flex items-center gap-2 font-bold text-white">
+                            <span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
+                            <span>Android Native Stack</span>
+                        </div>
+                        <ul class="text-xs text-gray-400 space-y-2 font-mono">
+                            <li>• Kotlin & Jetpack Compose modern UI</li>
+                            <li>• Embedded lightweight HTTP socket server on <code class="text-green-300">:8765</code></li>
+                            <li>• <code class="text-green-300">MediaStore</code> zero-confirmation direct routing</li>
+                            <li>• <code class="text-green-300">NotificationListenerService</code> for incoming alerts</li>
+                            <li>• Foreground service with Wi-Fi High Performance Lock</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- API Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs font-mono text-gray-400 border border-gray-800 rounded-lg overflow-hidden">
+                        <thead class="bg-gray-900 text-gray-200">
+                            <tr>
+                                <th class="p-3">Method & Endpoint</th>
+                                <th class="p-3">Purpose</th>
+                                <th class="p-3">Auth</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800 bg-gray-950/60">
+                            <tr>
+                                <td class="p-3 text-blue-400 font-semibold">GET /api/v1/ping</td>
+                                <td class="p-3">Service health, battery percentage, & feature flags</td>
+                                <td class="p-3 text-gray-500">Public</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 text-blue-400 font-semibold">POST /api/v1/pair</td>
+                                <td class="p-3">PIN code exchange & SHA-256 token authorization</td>
+                                <td class="p-3 text-amber-400">PIN Validated</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 text-blue-400 font-semibold">GET /api/v1/events</td>
+                                <td class="p-3">Persistent SSE stream (Input, Media, Commands, Notifications)</td>
+                                <td class="p-3 text-green-400">Bearer Token</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 text-blue-400 font-semibold">POST /api/v1/transfer/init</td>
+                                <td class="p-3">Chunked zero-click file upload stream</td>
+                                <td class="p-3 text-green-400">Bearer Token</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 text-blue-400 font-semibold">POST /api/v1/ring</td>
+                                <td class="p-3">Trigger maximum volume locator alarm</td>
+                                <td class="p-3 text-green-400">Bearer Token</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download Section -->
+    <section id="download" class="py-24 px-6 border-t border-gray-800/80 bg-dark-800/40">
+        <div class="max-w-4xl mx-auto text-center">
+            <h2 class="text-3xl sm:text-5xl font-extrabold tracking-tight mb-4">
+                Get BeamDrop for free.
+            </h2>
+            <p class="text-gray-400 text-sm sm:text-base mb-12">
+                Download the pre-compiled binary packages or build from source code.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                
+                <!-- macOS Card -->
+                <div class="glass-panel p-8 rounded-2xl border border-gray-800 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-3xl">🍏</span>
+                            <span class="text-xs px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">macOS 14+ Sonoma/Sequoia</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">BeamDrop for macOS</h3>
+                        <p class="text-gray-400 text-xs leading-relaxed mb-6">
+                            Native Apple Silicon build. Runs silently in the menu bar or dock with zero idle battery impact.
+                        </p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <a href="https://github.com/your-username/beamdrop/releases/latest/download/BeamDrop.zip" class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-white text-gray-950 hover:bg-gray-100 transition shadow-lg">
+                            <span>Download BeamDrop.app</span>
+                            <span class="text-[10px] text-gray-500 font-mono font-normal">(.zip • ~1.6 MB)</span>
+                        </a>
+                        <div class="p-2.5 rounded-lg bg-gray-900 border border-gray-800 text-[11px] font-mono text-gray-400 flex items-center justify-between">
+                            <span>open /Applications/BeamDrop.app</span>
+                            <button onclick="navigator.clipboard.writeText('open /Applications/BeamDrop.app')" class="text-gray-400 hover:text-white">Copy</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Android Card -->
+                <div class="glass-panel p-8 rounded-2xl border border-gray-800 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-3xl">🤖</span>
+                            <span class="text-xs px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-mono">Android 9.0+ to Android 15</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">BeamDrop for Android</h3>
+                        <p class="text-gray-400 text-xs leading-relaxed mb-6">
+                            Receiver service with background foreground notification, live trackpad, presentation clicker & MediaStore integration.
+                        </p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <a href="https://github.com/your-username/beamdrop/releases/latest/download/BeamDrop-Receiver.apk" class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-500 text-white transition shadow-lg shadow-blue-600/20">
+                            <span>Download BeamDrop APK</span>
+                            <span class="text-[10px] text-blue-200 font-mono font-normal">(.apk • ~15 MB)</span>
+                        </a>
+                        <div class="p-2.5 rounded-lg bg-gray-900 border border-gray-800 text-[11px] font-mono text-gray-400 flex items-center justify-between">
+                            <span>adb install -r BeamDrop-Receiver.apk</span>
+                            <button onclick="navigator.clipboard.writeText('adb install -r BeamDrop-Receiver.apk')" class="text-gray-400 hover:text-white">Copy</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section id="faq" class="py-24 px-6 border-t border-gray-800/80">
+        <div class="max-w-3xl mx-auto">
+            <h2 class="text-3xl font-extrabold tracking-tight text-center mb-12">
+                Frequently Asked Questions
+            </h2>
+
+            <div class="space-y-4">
+                <details class="glass-panel p-5 rounded-xl border border-gray-800 group">
+                    <summary class="font-bold text-sm text-gray-200 cursor-pointer list-none flex items-center justify-between">
+                        <span>Do I need an active internet connection to use BeamDrop?</span>
+                        <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <p class="text-xs text-gray-400 mt-3 leading-relaxed">
+                        No. BeamDrop works 100% offline. Both devices simply need to be connected to the same Wi-Fi network, personal mobile hotspot, or local router. Not a single byte ever leaves your local network.
+                    </p>
+                </details>
+
+                <details class="glass-panel p-5 rounded-xl border border-gray-800 group">
+                    <summary class="font-bold text-sm text-gray-200 cursor-pointer list-none flex items-center justify-between">
+                        <span>How does BeamDrop compare to KDE Connect?</span>
+                        <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <p class="text-xs text-gray-400 mt-3 leading-relaxed">
+                        BeamDrop includes all primary KDE Connect features (touchpad, media player remote, slide clicker, commands, battery status, notifications, find device) but is built natively in modern Swift/SwiftUI for macOS and Kotlin/Jetpack Compose for Android. It has zero Qt or C++ runtime bloat and adds zero-confirmation MediaStore photo/video routing.
+                    </p>
+                </details>
+
+                <details class="glass-panel p-5 rounded-xl border border-gray-800 group">
+                    <summary class="font-bold text-sm text-gray-200 cursor-pointer list-none flex items-center justify-between">
+                        <span>Is my clipboard or remote keystrokes private?</span>
+                        <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <p class="text-xs text-gray-400 mt-3 leading-relaxed">
+                        Yes. Communication occurs directly between your Mac and tablet over authenticated TCP sockets protected by pairing secrets and SHA-256 tokens stored securely in macOS Keychain and Android Keystore.
+                    </p>
+                </details>
+
+                <details class="glass-panel p-5 rounded-xl border border-gray-800 group">
+                    <summary class="font-bold text-sm text-gray-200 cursor-pointer list-none flex items-center justify-between">
+                        <span>Can I install it on multiple Android phones or tablets?</span>
+                        <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <p class="text-xs text-gray-400 mt-3 leading-relaxed">
+                        Yes. You can install `BeamDrop-Receiver.apk` on as many Android phones, tablets, or Android TVs as you like. Each device pairs independently with its own 6-digit PIN.
+                    </p>
+                </details>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-6 border-t border-gray-800 text-center text-xs text-gray-500">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-gray-300">BeamDrop</span>
+                <span>•</span>
+                <span>Released under the MIT License</span>
+            </div>
+            <div class="flex items-center gap-6">
+                <a href="https://github.com/your-username/beamdrop" class="hover:text-gray-300 transition">GitHub</a>
+                <a href="#features" class="hover:text-gray-300 transition">Features</a>
+                <a href="#download" class="hover:text-gray-300 transition">Download</a>
+                <a href="https://github.com/your-username/beamdrop/blob/main/LICENSE" class="hover:text-gray-300 transition">License</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Interactive Showcase Script -->
+    <script>
+        function switchTab(tabId) {
+            // Update Tab Buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                if (btn.dataset.tab === tabId) {
+                    btn.classList.remove('text-gray-400');
+                    btn.classList.add('bg-brand-600', 'text-white');
+                } else {
+                    btn.classList.remove('bg-brand-600', 'text-white');
+                    btn.classList.add('text-gray-400');
+                }
+            });
+
+            // Update Tab Content Panes
+            const tabs = ['transfer', 'clipboard', 'trackpad', 'media', 'commands', 'battery'];
+            tabs.forEach(t => {
+                const el = document.getElementById('tab-' + t);
+                if (el) {
+                    if (t === tabId) {
+                        el.classList.remove('hidden');
+                    } else {
+                        el.classList.add('hidden');
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

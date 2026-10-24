@@ -1,0 +1,28 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# macOS Swift build
+macos/.build/
+macos/DerivedData/
+*.xcuserstate
+*.xcuserdata
+
+# Android Gradle build
+android/.gradle/
+android/local.properties
+android/*/build/
+android/app/build/
+android/.idea/
+android/*.iml
+android/*/*.iml
+.idea/
+
+# Logs & scratch
+*.log
+scratch/
