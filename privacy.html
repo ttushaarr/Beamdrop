@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy — BeamDrop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0b0f19; color: #94a3b8; }
+        h1, h2, h3 { color: #f8fafc; }
+    </style>
+</head>
+<body class="py-12 px-6 max-w-4xl mx-auto">
+    <div class="mb-10 text-center">
+        <a href="index.html" class="inline-flex items-center gap-2 text-blue-400 text-sm font-semibold mb-4 hover:underline">
+            ← Back to BeamDrop
+        </a>
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Privacy Policy</h1>
+        <p class="text-sm text-gray-400">Effective Date: October 28, 2026 • Last Updated: October 28, 2026</p>
+    </div>
+
+    <div class="space-y-8 bg-gray-900/60 p-8 rounded-2xl border border-gray-800 text-sm leading-relaxed">
+        
+        <section>
+            <h2 class="text-lg font-bold mb-3 text-white">1. Overview &amp; Privacy Commitment</h2>
+            <p>
+                <strong>BeamDrop</strong> ("we", "our", or "the app"), developed by Tushar Urkudkar, is a completely open-source, local-first connectivity bridge between macOS and Android devices (Package ID: <code>com.beamdrop.receiver</code>).
+            </p>
+            <p class="mt-2">
+                Our core privacy principle is simple: <strong>Your data is yours. BeamDrop operates 100% peer-to-peer across your local Wi-Fi network. We do not operate external relay servers, we do not require account creation, and we do not collect, store, or sell any personal information.</strong>
+            </p>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold mb-3 text-white">2. Information We Do NOT Collect</h2>
+            <ul class="list-disc pl-5 space-y-1.5 text-gray-300">
+                <li><strong>No Personal Identifiers:</strong> We do not collect names, email addresses, phone numbers, or passwords.</li>
+                <li><strong>No Analytics or Telemetry:</strong> No analytics trackers (e.g. Google Firebase, Mixpanel, Segment) are bundled into the application.</li>
+                <li><strong>No Crash Reporting Relays:</strong> No crash logs or usage metrics are transmitted over the internet.</li>
+                <li><strong>No Location Data:</strong> We do not request, access, or track your GPS or fine location.</li>
+                <li><strong>No Advertising Trackers:</strong> BeamDrop contains zero advertisements, third-party marketing SDKs, or ad trackers.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold mb-3 text-white">3. Device Permissions &amp; Why We Request Them</h2>
+            <p class="mb-3">
+                To perform hardware and operating system integration between your Mac and Android device, BeamDrop requests specific permissions on your device. All data processed by these permissions stays strictly within your private local network:
+            </p>
+            
+            <div class="space-y-4">
+                <div class="p-4 rounded-xl bg-gray-800/60 border border-gray-700/60">
+                    <h3 class="font-bold text-white text-base">A. Notification Access (NotificationListenerService)</h3>
+                    <p class="mt-1 text-gray-300">
+                        <strong>Purpose:</strong> Allows incoming notification mirroring and quick replies to your paired Mac. 
+                        <strong>Scope:</strong> Notification text, app labels, and incoming call alerts are streamed exclusively to your authorized Mac over local Server-Sent Events (SSE). Notifications are never uploaded to any remote server or stored in persistent logs.
+                    </p>
+                </div>
+
+                <div class="p-4 rounded-xl bg-gray-800/60 border border-gray-700/60">
+                    <h3 class="font-bold text-white text-base">B. Camera (android.permission.CAMERA)</h3>
+                    <p class="mt-1 text-gray-300">
+                        <strong>Purpose:</strong> Powers the Continuity Camera and Wireless HD Webcam streaming features.
+                        <strong>Scope:</strong> Camera frames are converted to high-definition video frames and streamed over an encrypted local HTTP endpoint directly to your paired Mac or OBS Studio. Video frames are never recorded or sent outside your local network.
+                    </p>
+                </div>
+
+                <div class="p-4 rounded-xl bg-gray-800/60 border border-gray-700/60">
+                    <h3 class="font-bold text-white text-base">C. Storage &amp; Media Access (MediaStore)</h3>
+                    <p class="mt-1 text-gray-300">
+                        <strong>Purpose:</strong> Allows the app to save incoming photos, videos, and documents sent from your Mac.
+                        <strong>Scope:</strong> Files are saved directly to public user directories (<code>Pictures/LaptopTransfer</code>, <code>Movies/LaptopTransfer</code>, <code>Download/LaptopTransfer</code>) using standard Android scoped storage.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold mb-3 text-white">4. Local Network Peer-to-Peer Security</h2>
+            <p>
+                BeamDrop uses a 6-digit mutual pairing PIN to establish 256-bit cryptographic bearer tokens between your Mac and Android device. All HTTP and SSE requests require an <code>Authorization: Bearer &lt;token&gt;</code> header. Unpaired devices on your Wi-Fi cannot access your files or camera stream.
+            </p>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold mb-3 text-white">5. Children's Privacy</h2>
+            <p>
+                BeamDrop does not address anyone under the age of 13 and does not knowingly collect personally identifiable information from children.
+            </p>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold mb-3 text-white">6. Changes to this Privacy Policy</h2>
+            <p>
+                Any future updates will be posted to this page and reflected in the source repository. As BeamDrop is an open-source project, all changes are auditable via GitHub version history.
+            </p>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold mb-3 text-white">7. Contact &amp; Open Source Auditing</h2>
+            <p>
+                For questions regarding this policy or to audit the open-source code:
+            </p>
+            <p class="mt-2">
+                • <strong>Developer:</strong> Tushar Urkudkar<br>
+                • <strong>Email:</strong> <a href="mailto:ttushaarr@gmail.com" class="text-blue-400 hover:underline">ttushaarr@gmail.com</a><br>
+                • <strong>GitHub Repository:</strong> <a href="https://github.com/ttushaarr/Beamdrop" class="text-blue-400 hover:underline" target="_blank">https://github.com/ttushaarr/Beamdrop</a>
+            </p>
+        </section>
+
+    </div>
+
+    <div class="mt-8 text-center text-xs text-gray-500">
+        BeamDrop © 2026 Tushar Urkudkar. Released under the MIT License.
+    </div>
+</body>
+</html>
