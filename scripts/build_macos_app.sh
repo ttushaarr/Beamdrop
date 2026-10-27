@@ -44,7 +44,7 @@ cp "$MACOS_DIR/Resources/Info.plist" "$APP_BUNDLE/Contents/"
 chmod +x "$APP_BUNDLE/Contents/MacOS/BeamDrop"
 
 echo "Signing Application Bundle..."
-codesign --force --deep --sign - --entitlements "$MACOS_DIR/Resources/BeamDrop.entitlements" "$APP_BUNDLE" || true
+codesign --force --deep --sign - -r '=designated => identifier "com.beamdrop.BeamDrop"' --entitlements "$MACOS_DIR/Resources/BeamDrop.entitlements" "$APP_BUNDLE" || true
 
 echo "✓ Successfully built ${APP_BUNDLE}"
 ls -la "$APP_BUNDLE/Contents/MacOS"

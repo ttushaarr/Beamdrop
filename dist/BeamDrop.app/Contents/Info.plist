@@ -30,6 +30,8 @@
     </array>
     <key>NSLocalNetworkUsageDescription</key>
     <string>BeamDrop requires local network access to discover and transfer files to your Moto Pad 60 Pro over Wi-Fi.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>BeamDrop requires screen recording permission to stream your display to your Android tablet and capture screenshots.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>

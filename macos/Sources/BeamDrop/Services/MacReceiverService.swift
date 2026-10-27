@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import AppKit
+import ScreenCaptureKit
 
 public final class MacReceiverService: ObservableObject {
     public static let shared = MacReceiverService()
@@ -169,33 +170,51 @@ public final class MacReceiverService: ObservableObject {
     }
     
     private func handleScreenFrame(connection: NWConnection) {
-        guard let screen = NSScreen.main else {
-            sendHttpResponse(connection: connection, statusCode: 500, body: "{\"error\":\"No display available\"}")
-            return
-        }
-        
-        let rect = screen.frame
-        // Use nominal resolution and optimal compression for 30+ FPS low-latency streaming
-        guard let cgImage = CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, [.nominalResolution]) else {
-            sendHttpResponse(connection: connection, statusCode: 500, body: "{\"error\":\"Screen capture failed\"}")
-            return
-        }
-        
-        let rep = NSBitmapImageRep(cgImage: cgImage)
-        guard let jpegData = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.45]) else {
-            sendHttpResponse(connection: connection, statusCode: 500, body: "{\"error\":\"JPEG conversion failed\"}")
-            return
-        }
-        
-        let headerStr = "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: \(jpegData.count)\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n"
-        if let headerData = headerStr.data(using: .utf8) {
-            var fullData = headerData
-            fullData.append(jpegData)
-            connection.send(content: fullData, completion: .contentProcessed({ _ in
+        Task {
+            var capturedImage: CGImage? = nil
+            
+            // 1. Try ScreenCaptureKit (macOS 12.3+, Sonoma & Sequoia native)
+            do {
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                if let display = content.displays.first {
+                    let filter = SCContentFilter(display: display, excludingWindows: [])
+                    let config = SCStreamConfiguration()
+                    config.width = 1280
+                    config.height = 800
+                    config.showsCursor = true
+                    capturedImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                }
+            } catch {
+                // ScreenCaptureKit fallback
+            }
+            
+            // 2. Fallback to CGWindowListCreateImage if needed
+            if capturedImage == nil, let screen = NSScreen.main {
+                let rect = screen.frame
+                capturedImage = CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, [.nominalResolution])
+            }
+            
+            guard let validImage = capturedImage else {
+                self.sendHttpResponse(connection: connection, statusCode: 500, body: "{\"error\":\"Screen capture failed\"}")
+                return
+            }
+            
+            let rep = NSBitmapImageRep(cgImage: validImage)
+            guard let jpegData = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.45]) else {
+                self.sendHttpResponse(connection: connection, statusCode: 500, body: "{\"error\":\"JPEG conversion failed\"}")
+                return
+            }
+            
+            let headerStr = "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: \(jpegData.count)\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n"
+            if let headerData = headerStr.data(using: .utf8) {
+                var fullData = headerData
+                fullData.append(jpegData)
+                connection.send(content: fullData, completion: .contentProcessed({ _ in
+                    connection.cancel()
+                }))
+            } else {
                 connection.cancel()
-            }))
-        } else {
-            connection.cancel()
+            }
         }
     }
     

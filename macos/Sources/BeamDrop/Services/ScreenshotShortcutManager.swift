@@ -1,6 +1,7 @@
 import AppKit
 import Carbon
 import Foundation
+import ScreenCaptureKit
 import UserNotifications
 
 public final class ScreenshotShortcutManager: ObservableObject {
@@ -62,20 +63,17 @@ public final class ScreenshotShortcutManager: ObservableObject {
             return noErr
         }
         
-        let installStatus = InstallEventHandler(GetApplicationEventTarget(), handler, 1, &eventType, nil, &eventHandlerRef)
-        if installStatus != noErr {
-            print("ScreenshotShortcutManager: Failed to install event handler: \(installStatus)")
-        }
+        InstallEventHandler(GetApplicationEventTarget(), handler, 1, &eventType, nil, &eventHandlerRef)
         
-        // Shortcut 1: Cmd + Shift + D (kVK_ANSI_D = 0x02) - works globally across ALL apps without Accessibility perms
+        // Shortcut 1: Cmd + Shift + D (kVK_ANSI_D = 0x02) - system-wide global hotkey
         let hotKeyID1 = EventHotKeyID(signature: OSType(0x42445331), id: 1)
-        let reg1 = RegisterEventHotKey(UInt32(kVK_ANSI_D), UInt32(cmdKey | shiftKey), hotKeyID1, GetApplicationEventTarget(), 0, &hotKeyRefD)
+        RegisterEventHotKey(UInt32(kVK_ANSI_D), UInt32(cmdKey | shiftKey), hotKeyID1, GetApplicationEventTarget(), 0, &hotKeyRefD)
         
         // Shortcut 2: Cmd + Option + S (kVK_ANSI_S = 0x01) - secondary alternative
         let hotKeyID2 = EventHotKeyID(signature: OSType(0x42445332), id: 2)
-        let reg2 = RegisterEventHotKey(UInt32(kVK_ANSI_S), UInt32(cmdKey | optionKey), hotKeyID2, GetApplicationEventTarget(), 0, &hotKeyRefS)
+        RegisterEventHotKey(UInt32(kVK_ANSI_S), UInt32(cmdKey | optionKey), hotKeyID2, GetApplicationEventTarget(), 0, &hotKeyRefS)
         
-        print("ScreenshotShortcutManager: Registered system-wide Carbon HotKeys ⌘⇧D (status: \(reg1)) and ⌘⌥S (status: \(reg2))")
+        print("ScreenshotShortcutManager: Registered system-wide Carbon HotKeys ⌘⇧D and ⌘⌥S")
     }
     
     private func registerLocalMonitor() {
@@ -96,35 +94,62 @@ public final class ScreenshotShortcutManager: ObservableObject {
         guard !isCapturing else { return }
         isCapturing = true
         
-        DispatchQueue.main.async { [weak self] in
+        Task { [weak self] in
             defer { self?.isCapturing = false }
             
-            guard let screen = NSScreen.main else {
-                NSSound.beep()
+            // 1. Verify Screen Recording permission
+            if !CGPreflightScreenCaptureAccess() {
+                print("ScreenshotShortcutManager: Screen Recording permission not granted")
+                await MainActor.run {
+                    CGRequestScreenCaptureAccess()
+                    self?.notifyPermissionRequired()
+                    NSSound.beep()
+                }
                 return
             }
             
-            // Capture full display
-            guard let cgImage = CGWindowListCreateImage(screen.frame, .optionOnScreenOnly, kCGNullWindowID, [.bestResolution]) else {
-                NSSound.beep()
-                return
-            }
+            // Play camera shutter / screenshot chime immediately
+            await MainActor.run { NSSound(named: "Glass")?.play() }
             
-            let rep = NSBitmapImageRep(cgImage: cgImage)
-            guard let pngData = rep.representation(using: .png, properties: [:]) else {
-                NSSound.beep()
-                return
-            }
-            
-            // Play camera shutter / screenshot chime
-            NSSound(named: "Glass")?.play()
-            
-            // Write to temporary file with clean timestamp
+            // Format timestamped filename
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
             let dateStr = dateFormatter.string(from: Date())
             let fileName = "Mac_Screenshot_\(dateStr).png"
             let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+            try? FileManager.default.removeItem(at: tempURL)
+            
+            var capturedImage: CGImage? = nil
+            
+            // 2. Capture via modern ScreenCaptureKit (macOS 12.3+, Sequoia & Sonoma official API)
+            // ScreenCaptureKit captures full windows, desktop, and UI without black-screen redaction
+            do {
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                if let display = content.displays.first {
+                    let filter = SCContentFilter(display: display, excludingWindows: [])
+                    let config = SCStreamConfiguration()
+                    config.width = display.width
+                    config.height = display.height
+                    config.showsCursor = false
+                    capturedImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                    try? "SCK SUCCESS: \(display.width)x\(display.height)".write(toFile: "/tmp/sck_err.log", atomically: true, encoding: .utf8)
+                }
+            } catch {
+                try? "SCK ERROR: \(error.localizedDescription) details: \(error)".write(toFile: "/tmp/sck_err.log", atomically: true, encoding: .utf8)
+                print("ScreenCaptureKit error: \(error)")
+            }
+            
+            guard let validImage = capturedImage else {
+                print("ScreenshotShortcutManager: ScreenCaptureKit capture returned nil")
+                await MainActor.run { NSSound.beep() }
+                return
+            }
+            
+            let rep = NSBitmapImageRep(cgImage: validImage)
+            guard let pngData = rep.representation(using: .png, properties: [:]) else {
+                await MainActor.run { NSSound.beep() }
+                return
+            }
             
             do {
                 try pngData.write(to: tempURL)
@@ -153,17 +178,37 @@ public final class ScreenshotShortcutManager: ObservableObject {
             target.isPaired = true
             
             let item = TransferItem(url: tempURL)
-            TransferClient.shared.startTransfer(item: item, target: target) { result in
-                switch result {
-                case .success:
-                    NSSound(named: "Hero")?.play()
-                case .failure(let err):
-                    print("Screenshot transfer failed: \(err)")
+            await MainActor.run {
+                TransferClient.shared.startTransfer(item: item, target: target) { result in
+                    switch result {
+                    case .success:
+                        NSSound(named: "Hero")?.play()
+                    case .failure(let err):
+                        print("Screenshot transfer failed: \(err)")
+                    }
                 }
+                self?.notifyScreenshotDispatched(targetName: target.name, fileName: fileName)
             }
-            
-            // Show macOS notification
-            self?.notifyScreenshotDispatched(targetName: target.name, fileName: fileName)
+        }
+    }
+    
+    private func notifyPermissionRequired() {
+        let content = UNMutableNotificationContent()
+        content.title = "⚠️ Screen Recording Required"
+        content.body = "Please enable BeamDrop in System Settings > Screen Recording, then restart BeamDrop."
+        content.sound = .default
+        
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+        
+        let script = """
+        display notification "Please enable BeamDrop in System Settings > Screen & System Audio Recording." with title "Screen Recording Required"
+        """
+        var err: NSDictionary?
+        NSAppleScript(source: script)?.executeAndReturnError(&err)
+        
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
         }
     }
     
