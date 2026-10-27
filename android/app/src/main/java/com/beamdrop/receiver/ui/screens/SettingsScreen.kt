@@ -6,22 +6,27 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.beamdrop.receiver.ui.MainViewModel
 
 @Composable
@@ -41,6 +46,80 @@ fun SettingsScreen(viewModel: MainViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Gemini AI Solver Configuration Card
+        val currentApiKey by viewModel.geminiApiKey.collectAsState()
+        var keyInput by remember(currentApiKey) { mutableStateOf(currentApiKey) }
+
+        ElevatedCard(
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f))
+        ) {
+            Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "🤖 Gemini AI Question Solver",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+
+                Text(
+                    text = "When you press ⌘⇧X on your Mac, BeamDrop captures your question and solves it with Gemini AI right on your Moto Pad.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f)
+                )
+
+                OutlinedTextField(
+                    value = keyInput,
+                    onValueChange = { keyInput = it },
+                    label = { Text("Gemini API Key") },
+                    placeholder = { Text("AIzaSy...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey"))
+                            context.startActivity(browserIntent)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Get Free Key", fontSize = 12.sp)
+                    }
+
+                    Button(
+                        onClick = {
+                            viewModel.saveGeminiApiKey(keyInput.trim())
+                            Toast.makeText(context, "Gemini API key saved!", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Save Key", fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
         // Battery Optimization Card
         ElevatedCard(
             shape = RoundedCornerShape(16.dp),

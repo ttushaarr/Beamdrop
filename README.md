@@ -28,6 +28,7 @@
 | 🔋 **Bidirectional Battery** | Real-time battery percentage and charging indicator (⚡) visible on both devices. | ✅ Bi-dir | ✅ Bi-dir |
 | 📂 **Remote File Browser** | Browse, explore, and download files stored on your Android device from a native Finder view on macOS. | ✅ Client | ✅ Server |
 | 📸 **Mac Screenshot Shortcut** | Hit `Cmd + Shift + D` (or `Cmd + Option + S` / Menu Bar) to instantly capture your Mac screen and beam it straight to your tablet's gallery (`Pictures/LaptopTransfer/`). | ✅ Global Hotkey | ✅ Auto-Gallery |
+| 🤖 **Gemini AI Question Solver** | Hit `Cmd + Shift + X` (or `Cmd + Option + A` / Menu Bar) on Mac to capture any question, exam problem, or coding challenge on your screen. Beams to your tablet and solves it with Gemini AI step-by-step with zero browser tabs needed. Includes 1-tap **"Send to Mac Clipboard (⌘V)"**! | ✅ Global Hotkey (⌘⇧X) | ✅ Gemini AI |
 | ✍️ **Continuity Sketch Pad** | Draw, sketch, or sign on your tablet with finger/stylus and insert directly onto Mac Desktop or Mac Pasteboard (`Cmd+V`). | ✅ Receiver | ✅ Canvas |
 | 🖥️ **Wireless Second Screen** | Stream your MacBook screen to your Android tablet at 30+ FPS low latency with interactive touch clicks (Sidecar mode). | ✅ Streamer | ✅ Viewer |
 | 🔐 **Biometric Mac Unlock** | Unlock your MacBook wirelessly using your Android tablet's fingerprint sensor. | ✅ Receiver | ✅ Auth |

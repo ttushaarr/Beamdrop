@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.beamdrop.receiver.ui.MainViewModel
+import com.beamdrop.receiver.ui.screens.AiSolverScreen
 import com.beamdrop.receiver.ui.screens.DashboardScreen
 import com.beamdrop.receiver.ui.screens.HistoryScreen
 import com.beamdrop.receiver.ui.screens.MediaControlScreen
@@ -180,21 +181,23 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun DeviceAndSettingsScreen(viewModel: MainViewModel) {
-    var subTab by remember { mutableIntStateOf(0) }
+    var subTab by remember { mutableIntStateOf(1) } // Default to 🤖 AI Solver
     Column(modifier = Modifier.fillMaxSize()) {
         ScrollableTabRow(selectedTabIndex = subTab, edgePadding = 12.dp) {
             Tab(selected = subTab == 0, onClick = { subTab = 0 }, text = { Text("Pairing & QR") })
-            Tab(selected = subTab == 1, onClick = { subTab = 1 }, text = { Text("✍️ Sketch Pad") })
-            Tab(selected = subTab == 2, onClick = { subTab = 2 }, text = { Text("🖥️ Sidecar Display") })
-            Tab(selected = subTab == 3, onClick = { subTab = 3 }, text = { Text("History") })
-            Tab(selected = subTab == 4, onClick = { subTab = 4 }, text = { Text("Settings") })
+            Tab(selected = subTab == 1, onClick = { subTab = 1 }, text = { Text("🤖 AI Solver") })
+            Tab(selected = subTab == 2, onClick = { subTab = 2 }, text = { Text("✍️ Sketch Pad") })
+            Tab(selected = subTab == 3, onClick = { subTab = 3 }, text = { Text("🖥️ Sidecar Display") })
+            Tab(selected = subTab == 4, onClick = { subTab = 4 }, text = { Text("History") })
+            Tab(selected = subTab == 5, onClick = { subTab = 5 }, text = { Text("Settings") })
         }
         when (subTab) {
             0 -> PairingScreen(viewModel = viewModel)
-            1 -> SketchPadScreen(viewModel = viewModel)
-            2 -> SecondScreenView(viewModel = viewModel)
-            3 -> HistoryScreen(viewModel = viewModel)
-            4 -> SettingsScreen(viewModel = viewModel)
+            1 -> AiSolverScreen(viewModel = viewModel)
+            2 -> SketchPadScreen(viewModel = viewModel)
+            3 -> SecondScreenView(viewModel = viewModel)
+            4 -> HistoryScreen(viewModel = viewModel)
+            5 -> SettingsScreen(viewModel = viewModel)
         }
     }
 }

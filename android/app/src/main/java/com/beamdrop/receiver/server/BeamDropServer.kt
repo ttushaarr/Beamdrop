@@ -45,7 +45,8 @@ class BeamDropServer(
     private val onRingRequested: () -> Unit = {},
     private val onRingStopRequested: () -> Unit = {},
     private val onOpenUrl: (String) -> Unit = {},
-    private val onMacBatteryReceived: (Int, Boolean) -> Unit = { _, _ -> }
+    private val onMacBatteryReceived: (Int, Boolean) -> Unit = { _, _ -> },
+    private val onAiSolveRequested: (File, String) -> Unit = { _, _ -> }
 ) {
     private var serverSocket: ServerSocket? = null
     private val executor = Executors.newCachedThreadPool()
@@ -286,6 +287,9 @@ class BeamDropServer(
                 method == "GET" && path == "/api/v1/hotspot/status" -> {
                     handleHotspotStatus(output, headers)
                 }
+                method == "POST" && path == "/api/v1/ai/solve" -> {
+                    handleAiSolve(input, output, headers)
+                }
                 method == "POST" && path == "/api/v1/audio/play" -> {
                     handleAudioPlay(output, headers)
                 }
@@ -388,6 +392,48 @@ class BeamDropServer(
             onOpenUrl(url)
         }
         writeJsonResponse(output, 200, "OK", JSONObject().apply { put("status", "OPENED") })
+    }
+
+    private fun handleAiSolve(input: InputStream, output: OutputStream, headers: Map<String, String>) {
+        val authHeader = headers["authorization"]
+        if (!pairingManager.isAuthorized(authHeader)) {
+            writeJsonResponse(output, 401, "Unauthorized", JSONObject().apply { put("error", "Unauthorized") })
+            return
+        }
+
+        val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
+        if (contentLength <= 0) {
+            writeJsonResponse(output, 400, "Bad Request", JSONObject().apply { put("error", "Missing content-length") })
+            return
+        }
+
+        val bodyBytes = readExactBytes(input, contentLength)
+        val fileName = headers["x-beamdrop-file-name"] ?: "Gemini_Question_${System.currentTimeMillis()}.png"
+
+        val dir = File(context.cacheDir, "ai_questions").apply { mkdirs() }
+        val targetFile = File(dir, fileName)
+        targetFile.writeBytes(bodyBytes)
+
+        // Also save to MediaStore Pictures/LaptopTransfer as permanent backup
+        try {
+            mediaStoreSaver.saveStream(
+                transferId = java.util.UUID.randomUUID().toString(),
+                originalName = fileName,
+                totalBytes = bodyBytes.size.toLong(),
+                expectedSha256 = "",
+                inputStream = java.io.ByteArrayInputStream(bodyBytes),
+                onProgress = { _, _ -> }
+            )
+        } catch (_: Exception) {}
+
+        onAiSolveRequested(targetFile, fileName)
+
+        val resp = JSONObject().apply {
+            put("status", "QUEUED")
+            put("fileName", fileName)
+            put("message", "Question received. Solving with Gemini on Moto Pad.")
+        }
+        writeJsonResponse(output, 200, "OK", resp)
     }
 
     private fun handleMacBattery(input: InputStream, output: OutputStream, headers: Map<String, String>) {

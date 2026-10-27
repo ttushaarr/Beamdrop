@@ -9,6 +9,8 @@ import android.net.Uri
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.beamdrop.receiver.ai.AiQuestionItem
+import com.beamdrop.receiver.ai.GeminiApiService
 import com.beamdrop.receiver.model.ActiveTransferState
 import com.beamdrop.receiver.model.BatteryInfo
 import com.beamdrop.receiver.model.MediaActionPayload
@@ -58,6 +60,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isRinging = MutableStateFlow(false)
     val isRinging = _isRinging.asStateFlow()
 
+    private val geminiApiService = GeminiApiService(application)
+
+    private val _geminiApiKey = MutableStateFlow(geminiApiService.getApiKey())
+    val geminiApiKey = _geminiApiKey.asStateFlow()
+
+    private val _currentAiQuestion = MutableStateFlow<AiQuestionItem?>(null)
+    val currentAiQuestion = _currentAiQuestion.asStateFlow()
+
+    private val _aiQuestionHistory = MutableStateFlow<List<AiQuestionItem>>(emptyList())
+    val aiQuestionHistory = _aiQuestionHistory.asStateFlow()
+
+    private val _isAiSolving = MutableStateFlow(false)
+    val isAiSolving = _isAiSolving.asStateFlow()
+
     val outgoingTransfer = com.beamdrop.receiver.service.FileSenderManager.outgoingTransfer
     val targetMacIp = com.beamdrop.receiver.service.FileSenderManager.lastKnownMacIp
 
@@ -96,6 +112,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             viewModelScope.launch {
                 svc.isRinging.collect { _isRinging.value = it }
+            }
+            viewModelScope.launch {
+                svc.currentAiQuestion.collect { _currentAiQuestion.value = it }
+            }
+            viewModelScope.launch {
+                svc.aiQuestionHistory.collect { _aiQuestionHistory.value = it }
+            }
+            viewModelScope.launch {
+                svc.isAiSolving.collect { _isAiSolving.value = it }
             }
         }
 
@@ -278,6 +303,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val success = com.beamdrop.receiver.service.FileSenderManager.requestMacUnlock(mac, token)
             callback(success)
         }
+    }
+
+    fun saveGeminiApiKey(key: String) {
+        geminiApiService.saveApiKey(key)
+        _geminiApiKey.value = key.trim()
+    }
+
+    fun retryAiSolve(item: AiQuestionItem) {
+        service?.retryAiSolve(item)
+    }
+
+    fun askAiFollowUp(item: AiQuestionItem, followUp: String) {
+        service?.askAiFollowUp(item, followUp)
+    }
+
+    fun selectAiQuestion(item: AiQuestionItem) {
+        service?.selectAiQuestion(item)
+    }
+
+    fun sendClipboardTextToMac(text: String) {
+        service?.syncTextToMac(text)
     }
 
     override fun onCleared() {

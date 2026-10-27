@@ -10,6 +10,8 @@ public final class ScreenshotShortcutManager: ObservableObject {
     private var eventHandlerRef: EventHandlerRef?
     private var hotKeyRefD: EventHotKeyRef?
     private var hotKeyRefS: EventHotKeyRef?
+    private var hotKeyRefX: EventHotKeyRef?
+    private var hotKeyRefA: EventHotKeyRef?
     private var localMonitor: Any?
     private var isCapturing = false
     
@@ -28,6 +30,14 @@ public final class ScreenshotShortcutManager: ObservableObject {
         if let refS = hotKeyRefS {
             UnregisterEventHotKey(refS)
             hotKeyRefS = nil
+        }
+        if let refX = hotKeyRefX {
+            UnregisterEventHotKey(refX)
+            hotKeyRefX = nil
+        }
+        if let refA = hotKeyRefA {
+            UnregisterEventHotKey(refA)
+            hotKeyRefA = nil
         }
         if let handler = eventHandlerRef {
             RemoveEventHandler(handler)
@@ -55,9 +65,15 @@ public final class ScreenshotShortcutManager: ObservableObject {
                 nil,
                 &hotKeyID
             )
-            if status == noErr && (hotKeyID.id == 1 || hotKeyID.id == 2) {
-                DispatchQueue.main.async {
-                    ScreenshotShortcutManager.shared.captureAndSendScreenshot()
+            if status == noErr {
+                if hotKeyID.id == 1 || hotKeyID.id == 2 {
+                    DispatchQueue.main.async {
+                        ScreenshotShortcutManager.shared.captureAndSendScreenshot()
+                    }
+                } else if hotKeyID.id == 3 || hotKeyID.id == 4 {
+                    DispatchQueue.main.async {
+                        ScreenshotShortcutManager.shared.captureAndSendForAiSolve()
+                    }
                 }
             }
             return noErr
@@ -65,15 +81,23 @@ public final class ScreenshotShortcutManager: ObservableObject {
         
         InstallEventHandler(GetApplicationEventTarget(), handler, 1, &eventType, nil, &eventHandlerRef)
         
-        // Shortcut 1: Cmd + Shift + D (kVK_ANSI_D = 0x02) - system-wide global hotkey
+        // Shortcut 1: Cmd + Shift + D (kVK_ANSI_D = 0x02) - regular screenshot transfer
         let hotKeyID1 = EventHotKeyID(signature: OSType(0x42445331), id: 1)
         RegisterEventHotKey(UInt32(kVK_ANSI_D), UInt32(cmdKey | shiftKey), hotKeyID1, GetApplicationEventTarget(), 0, &hotKeyRefD)
         
-        // Shortcut 2: Cmd + Option + S (kVK_ANSI_S = 0x01) - secondary alternative
+        // Shortcut 2: Cmd + Option + S (kVK_ANSI_S = 0x01) - secondary screenshot transfer
         let hotKeyID2 = EventHotKeyID(signature: OSType(0x42445332), id: 2)
         RegisterEventHotKey(UInt32(kVK_ANSI_S), UInt32(cmdKey | optionKey), hotKeyID2, GetApplicationEventTarget(), 0, &hotKeyRefS)
         
-        print("ScreenshotShortcutManager: Registered system-wide Carbon HotKeys ⌘⇧D and ⌘⌥S")
+        // Shortcut 3: Cmd + Shift + X (kVK_ANSI_X = 0x07) - AI Question Solver
+        let hotKeyID3 = EventHotKeyID(signature: OSType(0x42445333), id: 3)
+        RegisterEventHotKey(UInt32(kVK_ANSI_X), UInt32(cmdKey | shiftKey), hotKeyID3, GetApplicationEventTarget(), 0, &hotKeyRefX)
+        
+        // Shortcut 4: Cmd + Option + A (kVK_ANSI_A = 0x00) - AI Question Solver secondary
+        let hotKeyID4 = EventHotKeyID(signature: OSType(0x42445334), id: 4)
+        RegisterEventHotKey(UInt32(kVK_ANSI_A), UInt32(cmdKey | optionKey), hotKeyID4, GetApplicationEventTarget(), 0, &hotKeyRefA)
+        
+        print("ScreenshotShortcutManager: Registered system-wide Carbon HotKeys ⌘⇧D, ⌘⌥S, ⌘⇧X, and ⌘⌥A")
     }
     
     private func registerLocalMonitor() {
@@ -84,6 +108,10 @@ public final class ScreenshotShortcutManager: ObservableObject {
             if (flags == [.command, .shift] && (chars == "d" || event.keyCode == 2)) ||
                (flags == [.command, .option] && (chars == "s" || event.keyCode == 1)) {
                 self?.captureAndSendScreenshot()
+                return nil
+            } else if (flags == [.command, .shift] && (chars == "x" || event.keyCode == 7)) ||
+                      (flags == [.command, .option] && (chars == "a" || event.keyCode == 0)) {
+                self?.captureAndSendForAiSolve()
                 return nil
             }
             return event
@@ -223,6 +251,145 @@ public final class ScreenshotShortcutManager: ObservableObject {
         
         let script = """
         display notification "Sending \(fileName) to \(targetName) (Pictures/LaptopTransfer)" with title "BeamDrop Screenshot (⌘⇧D)"
+        """
+        var err: NSDictionary?
+        NSAppleScript(source: script)?.executeAndReturnError(&err)
+    }
+
+    public func captureAndSendForAiSolve() {
+        guard !isCapturing else { return }
+        isCapturing = true
+        
+        Task { [weak self] in
+            defer { self?.isCapturing = false }
+            
+            // 1. Verify Screen Recording permission
+            if !CGPreflightScreenCaptureAccess() {
+                print("ScreenshotShortcutManager: Screen Recording permission not granted")
+                await MainActor.run {
+                    CGRequestScreenCaptureAccess()
+                    self?.notifyPermissionRequired()
+                    NSSound.beep()
+                }
+                return
+            }
+            
+            // Play futuristic shutter chime immediately
+            await MainActor.run { NSSound(named: "Submarine")?.play() }
+            
+            // Format timestamped filename
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
+            let dateStr = dateFormatter.string(from: Date())
+            let fileName = "Gemini_Question_\(dateStr).png"
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+            try? FileManager.default.removeItem(at: tempURL)
+            
+            var capturedImage: CGImage? = nil
+            
+            // 2. Capture via modern ScreenCaptureKit
+            do {
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                if let display = content.displays.first {
+                    let filter = SCContentFilter(display: display, excludingWindows: [])
+                    let config = SCStreamConfiguration()
+                    config.width = display.width
+                    config.height = display.height
+                    config.showsCursor = false
+                    capturedImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                }
+            } catch {
+                print("ScreenCaptureKit error: \(error)")
+            }
+            
+            guard let validImage = capturedImage else {
+                print("ScreenshotShortcutManager: ScreenCaptureKit capture returned nil")
+                await MainActor.run { NSSound.beep() }
+                return
+            }
+            
+            let rep = NSBitmapImageRep(cgImage: validImage)
+            guard let pngData = rep.representation(using: .png, properties: [:]) else {
+                await MainActor.run { NSSound.beep() }
+                return
+            }
+            
+            do {
+                try pngData.write(to: tempURL)
+            } catch {
+                print("Failed to save screenshot: \(error)")
+                return
+            }
+            
+            // Resolve destination target
+            let discovery = DeviceDiscoveryService.shared
+            var target = discovery.selectedDevice ?? discovery.discoveredDevices.first ?? PairedDevice(
+                id: "moto-pad-60-pro-f5bfb763",
+                name: "Moto Pad 60 Pro",
+                host: "192.168.1.7",
+                port: 8765,
+                serverAuthToken: discovery.getSavedAuthToken(),
+                clientAuthToken: UUID().uuidString,
+                lastSeen: Date(),
+                isOnline: true,
+                isPaired: true
+            )
+            
+            if target.serverAuthToken.isEmpty {
+                target.serverAuthToken = discovery.getSavedAuthToken()
+            }
+            target.isPaired = true
+            
+            await self?.sendToTabletAiEndpoint(imageURL: tempURL, fileName: fileName, target: target)
+        }
+    }
+    
+    private func sendToTabletAiEndpoint(imageURL: URL, fileName: String, target: PairedDevice) async {
+        guard let baseURL = target.baseURL else { return }
+        let aiURL = baseURL.appendingPathComponent("/api/v1/ai/solve")
+        var request = URLRequest(url: aiURL)
+        request.httpMethod = "POST"
+        
+        let authToken = !target.serverAuthToken.isEmpty ? target.serverAuthToken : DeviceDiscoveryService.shared.getSavedAuthToken()
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(fileName, forHTTPHeaderField: "X-BeamDrop-File-Name")
+        request.setValue("image/png", forHTTPHeaderField: "Content-Type")
+        
+        do {
+            let data = try Data(contentsOf: imageURL)
+            request.setValue("\(data.count)", forHTTPHeaderField: "Content-Length")
+            request.httpBody = data
+            
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode == 200 {
+                await MainActor.run {
+                    NSSound(named: "Hero")?.play()
+                    self.notifyAiSolveDispatched(targetName: target.name)
+                }
+            } else {
+                // Fallback: send via TransferClient
+                let item = TransferItem(url: imageURL)
+                await MainActor.run {
+                    TransferClient.shared.startTransfer(item: item, target: target) { _ in }
+                    self.notifyAiSolveDispatched(targetName: target.name)
+                }
+            }
+        } catch {
+            print("Failed to dispatch AI solve request: \(error)")
+        }
+    }
+
+    private func notifyAiSolveDispatched(targetName: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "🤖 Beaming Question to \(targetName)"
+        content.body = "Captured question screenshot. Gemini is solving it now on your Moto Pad!"
+        content.sound = .default
+        
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+        
+        let script = """
+        display notification "Solving question on \(targetName) with Gemini..." with title "🤖 BeamDrop AI Solver (⌘⇧X)"
         """
         var err: NSDictionary?
         NSAppleScript(source: script)?.executeAndReturnError(&err)

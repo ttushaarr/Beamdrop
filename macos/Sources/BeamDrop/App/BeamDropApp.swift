@@ -43,10 +43,15 @@ struct BeamDropApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandMenu("Actions") {
-                Button("Send Screenshot to Tablet") {
+                Button("Send Screenshot to Tablet (⌘⇧D)") {
                     ScreenshotShortcutManager.shared.captureAndSendScreenshot()
                 }
                 .keyboardShortcut("d", modifiers: [.command, .shift])
+
+                Button("Solve Question on Screen with Gemini (⌘⇧X)") {
+                    ScreenshotShortcutManager.shared.captureAndSendForAiSolve()
+                }
+                .keyboardShortcut("x", modifiers: [.command, .shift])
             }
         }
     }

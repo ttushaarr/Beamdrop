@@ -24,6 +24,8 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.beamdrop.receiver.MainActivity
+import com.beamdrop.receiver.ai.AiQuestionItem
+import com.beamdrop.receiver.ai.GeminiApiService
 import com.beamdrop.receiver.model.ActiveTransferState
 import com.beamdrop.receiver.model.BatteryInfo
 import com.beamdrop.receiver.model.MediaActionPayload
@@ -32,8 +34,13 @@ import com.beamdrop.receiver.model.TransferRecord
 import com.beamdrop.receiver.security.PairingManager
 import com.beamdrop.receiver.server.BeamDropServer
 import com.beamdrop.receiver.server.NsdHelper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
@@ -71,6 +78,18 @@ class FileReceiverForegroundService : Service() {
 
     private val _macBattery = MutableStateFlow<BatteryInfo?>(null)
     val macBattery = _macBattery.asStateFlow()
+
+    lateinit var geminiApiService: GeminiApiService
+        private set
+
+    private val _currentAiQuestion = MutableStateFlow<AiQuestionItem?>(null)
+    val currentAiQuestion = _currentAiQuestion.asStateFlow()
+
+    private val _aiQuestionHistory = MutableStateFlow<List<AiQuestionItem>>(emptyList())
+    val aiQuestionHistory = _aiQuestionHistory.asStateFlow()
+
+    private val _isAiSolving = MutableStateFlow(false)
+    val isAiSolving = _isAiSolving.asStateFlow()
 
     val isRinging get() = ringtoneHelper.isRinging
 
@@ -111,6 +130,7 @@ class FileReceiverForegroundService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        geminiApiService = GeminiApiService(this)
         pairingManager = PairingManager(this)
         nsdHelper = NsdHelper(this)
         ringtoneHelper = RingtoneHelper(this)
@@ -173,6 +193,21 @@ class FileReceiverForegroundService : Service() {
 
     fun openUrlOnMac(url: String) {
         server?.broadcastOpenUrlOnMac(url)
+    }
+
+    fun syncTextToMac(text: String) {
+        mainHandler.post {
+            try {
+                val clip = ClipData.newPlainText("Gemini Solution", text)
+                clipboardManager.setPrimaryClip(clip)
+                lastSyncedClipboardText = text
+                _lastClipboardSynced.value = text
+                server?.broadcastClipboard(text)
+                Log.i(TAG, "Explicitly synced text to Mac clipboard (${text.length} chars)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error syncing text to Mac: ${e.message}")
+            }
+        }
     }
 
     fun syncCurrentClipboardToMac() {
@@ -275,6 +310,9 @@ class FileReceiverForegroundService : Service() {
             },
             onMacBatteryReceived = { pct, isCharging ->
                 _macBattery.value = BatteryInfo(pct, isCharging)
+            },
+            onAiSolveRequested = { file, fileName ->
+                handleIncomingAiQuestion(file, fileName)
             }
         )
 
@@ -294,6 +332,84 @@ class FileReceiverForegroundService : Service() {
         releaseLocks()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    fun handleIncomingAiQuestion(file: File, fileName: String) {
+        val questionItem = AiQuestionItem(
+            imagePath = file.absolutePath,
+            fileName = fileName,
+            isSolving = true
+        )
+        _currentAiQuestion.value = questionItem
+        _isAiSolving.value = true
+        updateNotification("🤖 Solving Question with Gemini...", fileName)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = geminiApiService.solveQuestionFromImage(file)
+            withContext(Dispatchers.Main) {
+                _isAiSolving.value = false
+                val updated = questionItem.copy(
+                    isSolving = false,
+                    solutionMarkdown = result.solutionText,
+                    errorMessage = result.errorMessage
+                )
+                _currentAiQuestion.value = updated
+                val history = _aiQuestionHistory.value.toMutableList()
+                history.add(0, updated)
+                _aiQuestionHistory.value = history
+
+                if (result.success) {
+                    updateNotification("✅ Question Solved by Gemini!", fileName)
+                } else {
+                    updateNotification("⚠️ Gemini Solve Failed", result.errorMessage ?: "Error")
+                }
+            }
+        }
+    }
+
+    fun retryAiSolve(item: AiQuestionItem) {
+        val file = File(item.imagePath)
+        if (!file.exists()) return
+        _isAiSolving.value = true
+        _currentAiQuestion.value = item.copy(isSolving = true, errorMessage = null)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = geminiApiService.solveQuestionFromImage(file)
+            withContext(Dispatchers.Main) {
+                _isAiSolving.value = false
+                val updated = item.copy(
+                    isSolving = false,
+                    solutionMarkdown = result.solutionText,
+                    errorMessage = result.errorMessage
+                )
+                _currentAiQuestion.value = updated
+            }
+        }
+    }
+
+    fun askAiFollowUp(item: AiQuestionItem, followUp: String) {
+        val file = File(item.imagePath)
+        if (!file.exists()) return
+        _isAiSolving.value = true
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = geminiApiService.askFollowUp(file, item.solutionMarkdown ?: "", followUp)
+            withContext(Dispatchers.Main) {
+                _isAiSolving.value = false
+                if (result.success) {
+                    val combined = (item.solutionMarkdown ?: "") + "\n\n---\n### 💬 Follow-Up\n**Q: $followUp**\n\n" + (result.solutionText ?: "")
+                    val updated = item.copy(solutionMarkdown = combined)
+                    _currentAiQuestion.value = updated
+                } else {
+                    val updated = item.copy(errorMessage = result.errorMessage)
+                    _currentAiQuestion.value = updated
+                }
+            }
+        }
+    }
+
+    fun selectAiQuestion(item: AiQuestionItem) {
+        _currentAiQuestion.value = item
     }
 
     private fun acquireLocks() {
