@@ -1,0 +1,46 @@
+Categories:
+  - Connectivity
+  - Development
+  - System
+License: MIT
+AuthorName: Tushar Urkudkar
+SourceCode: https://github.com/ttushaarr/Beamdrop
+IssueTracker: https://github.com/ttushaarr/Beamdrop/issues
+WebSite: https://ttushaarr.github.io/Beamdrop/
+
+AutoName: BeamDrop
+
+Summary: Open-source AirDrop & KDE Connect bridge for macOS and Android
+
+Description: |-
+  BeamDrop connects macOS with Android over local Wi-Fi with zero cloud relays, zero accounts, and 100% peer-to-peer privacy.
+
+  Features:
+  * Zero-Click File Drops into Gallery, Movies, and Downloads
+  * 1-Click Wireless ADB debugging over Wi-Fi
+  * Custom Mac Script Launchers (Elgato StreamDeck alternative)
+  * Wireless HD Webcam for Zoom, Google Meet & OBS Studio
+  * Incoming Call & SMS Alerts with 1-click decline and quick reply
+  * Gemini AI question solver with dark-mode syntax
+  * Global screenshot beam (⌘⇧D)
+  * Bidirectional live clipboard synchronization
+  * Remote trackpad cursor, gestures, and typing
+  * Media playback remote & presentation slide clicker
+  * Find My Device siren & battery monitor
+
+RepoType: git
+Repo: https://github.com/ttushaarr/Beamdrop.git
+
+Builds:
+  - versionName: 1.4.0
+    versionCode: 4
+    commit: v1.4.0
+    subdir: android
+    gradle:
+      - yes
+    output: app/build/outputs/apk/release/app-release.apk
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags
+CurrentVersion: 1.4.0
+CurrentVersionCode: 4

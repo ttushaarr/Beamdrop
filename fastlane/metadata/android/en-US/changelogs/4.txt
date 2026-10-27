@@ -1,0 +1,7 @@
+v1.4.0 Release:
+• Added 1-Click Wireless ADB over Wi-Fi with Android 11+ pairing code dialog.
+• Added Custom Mac Script Launchers with live monospace terminal console.
+• Added Wireless HD Webcam MJPEG streaming (720p 30fps) for OBS, Zoom, and Meet.
+• Added Incoming Call & SMS Alerts with 1-click decline and quick reply messages.
+• Dynamic Wi-Fi device auto-discovery with per-device PIN fallback.
+• Performance optimizations and battery savings.

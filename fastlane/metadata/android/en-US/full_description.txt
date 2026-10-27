@@ -1,0 +1,14 @@
+BeamDrop is a free and open-source local Wi-Fi bridge between macOS and Android devices. It requires zero cloud relays, zero accounts, and works with 100% peer-to-peer privacy.
+
+Features:
+• Zero-Click File Transfers: Photos, videos, and documents sent from Mac auto-route into your Android Pictures, Movies, and Download folders with instant gallery indexing.
+• 1-Click Wireless ADB: Pair and debug your device wirelessly over Wi-Fi without cables or typing IP/ports.
+• Custom Mac Script Launchers: Turn your tablet or phone into a customizable Stream Deck to trigger Mac developer shell scripts (e.g. npm run dev, docker compose, git pull) and inspect live terminal output.
+• Wireless HD Webcam: Stream your phone or tablet camera directly into OBS Virtual Cam, Zoom, and Google Meet at low latency.
+• Incoming Call & SMS Alerts: View incoming calls on your Mac screen with 1-click decline and quick reply messages.
+• Gemini AI Question Solver: Capture any question on Mac with ⌘⇧X and solve with Gemini AI in clear English on your tablet.
+• Global Screenshot Beam: Press ⌘⇧D on Mac to beam Retina screenshots straight to your Android Pictures folder.
+• Bidirectional Clipboard Sync: Instant copy-paste between devices over local Server-Sent Events (SSE).
+• Remote Input & Trackpad: Wireless mouse cursor control with click, double-click, right-click, and keyboard typing.
+• Media Remote & Presentation Clicker: Control Mac audio/video playback and slide decks remotely.
+• Find My Device: Ring your lost tablet from Mac with maximum siren volume even when set to silent.

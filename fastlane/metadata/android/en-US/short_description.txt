@@ -1,0 +1,1 @@
+Fast, private AirDrop & KDE Connect bridge between macOS and Android over local Wi-Fi.

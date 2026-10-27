@@ -1,15 +1,43 @@
 # BeamDrop: AirDrop & KDE Connect for macOS and Android
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-1.4.0-blue?style=for-the-badge&logo=apple" alt="Version 1.4.0" />
+  <img src="https://img.shields.io/badge/Homebrew-brew%20install%20beamdrop-orange?style=for-the-badge&logo=homebrew" alt="Homebrew Cask" />
+  <img src="https://img.shields.io/badge/F--Droid-Ready-3DDC84?style=for-the-badge&logo=f-droid" alt="F-Droid Ready" />
+  <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Android-black?style=for-the-badge" alt="Platforms" />
+  <img src="https://img.shields.io/badge/License-MIT-emerald?style=for-the-badge" alt="MIT License" />
+</p>
+
 > **Fast, secure, local Wi-Fi file sharing & bidirectional device integration.**  
-> Seamless two-way zero-click file transfers, Android Share Sheet integration, Mac menu bar quick drop, continuity camera snapshots, camera roll backup, inline notification quick replies, live clipboard synchronization, remote trackpad gestures, media remote, presentation clicker, and system automations between MacBook and Android.  
+> Seamless two-way zero-click file transfers, 1-Click Wireless ADB, customizable Mac script launchers (Stream Deck alternative), wireless HD webcam for Zoom/OBS, incoming call & SMS alerts, live clipboard synchronization, remote trackpad gestures, media remote, presentation clicker, and Gemini AI problem solver between MacBook and Android.  
 > **100% Open Source • 100% Local Wi-Fi • Zero Cloud Servers • Zero Telemetry.**
 
+<p align="center">
+  <img src="docs/assets/beamdrop-demo.svg" alt="BeamDrop Demo Preview" width="100%" />
+</p>
+
 🌐 **Live Website**: [https://ttushaarr.github.io/Beamdrop/](https://ttushaarr.github.io/Beamdrop/)  
-📦 **Direct Downloads**:
-- 🍏 **macOS (Apple Silicon)**: [Download BeamDrop-Mac.zip](https://github.com/ttushaarr/Beamdrop/raw/main/dist/BeamDrop-Mac.zip) (~530 KB)
-- 🤖 **Android (Phones & Tablets)**: [Download BeamDrop-Receiver.apk](https://github.com/ttushaarr/Beamdrop/raw/main/dist/BeamDrop-Receiver.apk) (~16 MB)
-- 📁 **All Releases & Binaries**: [Browse `dist/` Directory](https://github.com/ttushaarr/Beamdrop/tree/main/dist)
-📜 **License**: [MIT License](LICENSE).
+
+---
+
+## ⚡ Quick Install
+
+### 🍏 macOS (Homebrew Cask)
+Install with a single command via Homebrew:
+```bash
+brew install --cask https://raw.githubusercontent.com/ttushaarr/Beamdrop/main/Casks/beamdrop.rb
+```
+*Or add the tap:*
+```bash
+brew tap ttushaarr/beamdrop https://github.com/ttushaarr/Beamdrop
+brew install --cask beamdrop
+```
+*Manual DMG / Zip download*: [Download BeamDrop-Mac.zip](https://github.com/ttushaarr/Beamdrop/raw/main/dist/BeamDrop-Mac.zip) (~540 KB)
+
+### 🤖 Android (APK & F-Droid)
+- **Direct APK**: [Download BeamDrop-Receiver.apk](https://github.com/ttushaarr/Beamdrop/raw/main/dist/BeamDrop-Receiver.apk) (~11 MB)
+- **F-Droid Build Recipe**: Included at [`metadata/com.beamdrop.receiver.yml`](metadata/com.beamdrop.receiver.yml)
+- **All Releases & Binaries**: [Browse `dist/` Directory](https://github.com/ttushaarr/Beamdrop/tree/main/dist)
 
 ---
 
@@ -17,7 +45,11 @@
 
 | Feature | Description | macOS | Android |
 | :--- | :--- | :---: | :---: |
-| ⚡ **Zero-Click File Drops** | Photos, videos, and docs sent from Mac auto-route into Android `Pictures/`, `Movies/`, and `Download/` with instant gallery indexing. | ✅ Sender | ✅ Receiver |
+| ⚡ **1-Click Wireless ADB** | Pair and connect ADB wirelessly over Wi-Fi without USB cables or typing `adb connect ip:port`. Includes pairing code dialog. | ✅ Controller | ✅ Target |
+| 🚀 **Mac Script Launchers** | Turns your tablet or phone into a customizable Stream Deck (trigger `npm run dev`, `docker compose`, `git pull`) with real-time terminal output. | ✅ Executor | ✅ Controller |
+| 📹 **Wireless HD Webcam** | Stream phone camera to OBS Studio, Zoom, and Google Meet at low-latency 720p 30 FPS. Includes floating Mac live viewer. | ✅ Live Viewer | ✅ 720p Camera |
+| 📞 **Incoming Call & SMS Alerts** | See who is calling on your Mac screen with 1-click ringer mute, instant decline, or quick SMS reply pills. | ✅ Alerts / Actions | ✅ Dialer Relay |
+| 📁 **Zero-Click File Drops** | Photos, videos, and docs sent from Mac auto-route into Android `Pictures/`, `Movies/`, and `Download/` with instant gallery indexing. | ✅ Sender | ✅ Receiver |
 | 📤 **Android ➔ Mac Sharing** | Send files from Android to Mac's `~/Downloads/BeamDrop/` via the in-app picker or native Android Share Sheet (`ACTION_SEND`). | ✅ Receiver | ✅ Sender |
 | 🪟 **Menu Bar Quick Drop** | Drag files directly onto the macOS menu bar icon to send instantly without opening the main application window. | ✅ Sender | — |
 | 📸 **Continuity Camera** | Use your Android camera as a Mac continuity webcam with 1-click high-res snapshot capture to `~/Desktop/`. | ✅ Viewer | ✅ Capture |
