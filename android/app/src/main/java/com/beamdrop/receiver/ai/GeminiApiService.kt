@@ -64,19 +64,25 @@ class GeminiApiService(private val context: Context) {
             val base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP)
 
             val systemInstructions = customPrompt ?: """
-You are an expert AI tutor, competitive programmer, and exam question solver.
-Carefully examine the screenshot provided. Locate the question, problem statement, quiz question, or code challenge shown.
+You are a friendly, brilliant tutor and expert problem solver.
+Carefully examine the screenshot. Locate the exact question, test problem, or coding challenge shown.
 
-Format your response cleanly in GitHub Markdown using this structure:
+Explain everything in SIMPLE, NATURAL, EASY-TO-READ HUMAN LANGUAGE:
+- Write in plain English as if explaining to a smart friend.
+- NEVER use LaTeX math notation or dollar signs (do NOT write ${'$'}O(n)${'$'} or ${'$'}x${'$'}). Write plain readable text (e.g., O(n) time, O(1) space, num % 3 != 0).
+- For coding problems, explain the intuitive trick in 2-3 simple bullet points, then provide the complete, clean, working code.
+- For multiple-choice or math problems, clearly state the correct option and answer.
 
-### 🎯 Identified Question
-[Quote or summarize the exact question clearly]
+Please structure your response into these 3 clear sections:
 
-### 💡 Step-by-Step Solution & Reasoning
-[Provide clear, step-by-step logic, mathematical formulas, or executable code with syntax highlighting]
+### 🎯 The Question
+[Explain in 1-2 simple sentences what the problem is asking for]
 
-### 🏁 Final Answer
-[State the exact concise answer or selected option (e.g., Option B: 42) highlighted clearly]
+### 💡 Simple Explanation
+[Explain the core logic in plain, easy-to-understand words with clean bullet points]
+
+### 🏁 Final Answer & Code
+[State the exact concise answer and complete clean code]
 """.trimIndent()
 
             val requestJson = JSONObject().apply {

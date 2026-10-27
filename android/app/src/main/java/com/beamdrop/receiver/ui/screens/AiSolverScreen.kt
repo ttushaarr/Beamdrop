@@ -12,9 +12,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -351,6 +353,7 @@ fun ActiveQuestionCard(
     onSendToMac: () -> Unit,
     onRetry: () -> Unit
 ) {
+    val context = LocalContext.current
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -442,16 +445,16 @@ fun ActiveQuestionCard(
                 }
             }
 
-            // Solution Markdown
+            // Solution Content Formatted View
             if (item.solutionMarkdown != null && !isSolving) {
-                SelectionContainer {
-                    Text(
-                        text = item.solutionMarkdown,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        lineHeight = 22.sp
-                    )
-                }
+                FormattedSolutionView(
+                    rawMarkdown = item.solutionMarkdown,
+                    onCopyCode = { code ->
+                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("Code", code))
+                        Toast.makeText(context, "Copied code snippet!", Toast.LENGTH_SHORT).show()
+                    }
+                )
 
                 // Action Bar
                 Row(
@@ -532,6 +535,192 @@ fun HistoryQuestionItem(
                 )
             }
             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+        }
+    }
+}
+
+sealed class MarkdownSegment {
+    data class Header(val title: String) : MarkdownSegment()
+    data class CodeBlock(val language: String, val code: String) : MarkdownSegment()
+    data class Paragraph(val text: String) : MarkdownSegment()
+    data class BulletItem(val text: String) : MarkdownSegment()
+}
+
+fun sanitizeReadableText(text: String): String {
+    var s = text
+    // Replace **$O(n)$** or **$O(1)$** with clean text O(n), O(1)
+    s = s.replace(Regex("""\*\*\$([^\$]+)\$\*\*"""), "$1")
+    s = s.replace(Regex("""\*\$([^\$]+)\$\*"""), "$1")
+    s = s.replace(Regex("""\$([^\$]+)\$"""), "$1")
+    s = s.replace(Regex("""\*\*`([^`]+)`\*\*"""), "`$1`")
+    return s
+}
+
+fun parseMarkdownSegments(markdown: String): List<MarkdownSegment> {
+    val segments = mutableListOf<MarkdownSegment>()
+    val lines = markdown.lines()
+    var inCodeBlock = false
+    var codeLang = ""
+    val codeLines = mutableListOf<String>()
+
+    for (line in lines) {
+        val trimmed = line.trim()
+        if (trimmed.startsWith("```")) {
+            if (inCodeBlock) {
+                segments.add(MarkdownSegment.CodeBlock(codeLang, codeLines.joinToString("\n")))
+                codeLines.clear()
+                codeLang = ""
+                inCodeBlock = false
+            } else {
+                inCodeBlock = true
+                codeLang = trimmed.removePrefix("```").trim()
+            }
+        } else if (inCodeBlock) {
+            codeLines.add(line)
+        } else if (trimmed.startsWith("### ") || trimmed.startsWith("## ") || trimmed.startsWith("# ")) {
+            val title = trimmed.replace(Regex("""^#+\s*"""), "")
+            segments.add(MarkdownSegment.Header(title))
+        } else if (trimmed.startsWith("* ") || trimmed.startsWith("- ") || trimmed.startsWith("• ")) {
+            val bulletText = trimmed.replace(Regex("""^[\*\-•]\s*"""), "")
+            segments.add(MarkdownSegment.BulletItem(bulletText))
+        } else if (trimmed.isNotEmpty() && trimmed != "---") {
+            segments.add(MarkdownSegment.Paragraph(trimmed))
+        }
+    }
+
+    if (inCodeBlock && codeLines.isNotEmpty()) {
+        segments.add(MarkdownSegment.CodeBlock(codeLang, codeLines.joinToString("\n")))
+    }
+
+    return segments
+}
+
+@Composable
+fun FormattedSolutionView(
+    rawMarkdown: String,
+    onCopyCode: (String) -> Unit
+) {
+    val cleanText = remember(rawMarkdown) { sanitizeReadableText(rawMarkdown) }
+    val segments = remember(cleanText) { parseMarkdownSegments(cleanText) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        segments.forEach { segment ->
+            when (segment) {
+                is MarkdownSegment.Header -> {
+                    val isFinalAnswer = segment.title.contains("Answer", ignoreCase = true) || segment.title.contains("🏁")
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isFinalAnswer)
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = segment.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isFinalAnswer)
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            else
+                                MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+                is MarkdownSegment.CodeBlock -> {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E2E))
+                    ) {
+                        Column {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFF2A2A3C))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = segment.language.uppercase().ifEmpty { "CODE" },
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF89B4FA),
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                TextButton(
+                                    onClick = { onCopyCode(segment.code) },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copy Code",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Copy Code", fontSize = 11.sp, color = Color.White)
+                                }
+                            }
+                            SelectionContainer {
+                                Text(
+                                    text = segment.code,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 13.sp,
+                                    lineHeight = 19.sp,
+                                    color = Color(0xFFCDD6F4),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState())
+                                        .padding(14.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                is MarkdownSegment.Paragraph -> {
+                    SelectionContainer {
+                        Text(
+                            text = segment.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            lineHeight = 22.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                is MarkdownSegment.BulletItem -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 6.dp, end = 2.dp, top = 2.dp, bottom = 2.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = "•",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        SelectionContainer {
+                            Text(
+                                text = segment.text,
+                                style = MaterialTheme.typography.bodyMedium,
+                                lineHeight = 21.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
