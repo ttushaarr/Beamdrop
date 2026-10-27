@@ -26,3 +26,5 @@ android/*/*.iml
 # Logs & scratch
 *.log
 scratch/
+.agents/
+

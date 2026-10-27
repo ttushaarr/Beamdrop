@@ -8,6 +8,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = DeviceDiscoveryService.shared
         _ = ClipboardSyncService.shared
         _ = KdeConnectService.shared
+        _ = MacReceiverService.shared
+        
+        MacReceiverService.shared.start()
+        MenuBarManager.shared.setupMenuBar()
         ClipboardSyncService.shared.startMonitoringMacPasteboard()
         ClipboardSyncService.shared.startSseConnection()
         KdeConnectService.shared.start()

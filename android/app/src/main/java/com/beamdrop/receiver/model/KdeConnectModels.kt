@@ -33,5 +33,7 @@ data class MirroredNotification(
     val appName: String,
     val title: String,
     val text: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val key: String = "",
+    val canReply: Boolean = false
 )

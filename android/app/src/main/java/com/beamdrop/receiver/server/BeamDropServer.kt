@@ -176,6 +176,8 @@ class BeamDropServer(
             put("title", notif.title)
             put("text", notif.text)
             put("timestamp", notif.timestamp)
+            put("key", notif.key)
+            put("canReply", notif.canReply)
         }
         broadcastEvent("notification", json)
     }
@@ -193,6 +195,11 @@ class BeamDropServer(
         var isSseConnection = false
         try {
             socket.tcpNoDelay = true
+            val remoteIp = socket.inetAddress?.hostAddress
+            if (!remoteIp.isNullOrEmpty() && remoteIp != "127.0.0.1" && !remoteIp.startsWith("::")) {
+                com.beamdrop.receiver.service.FileSenderManager.setLastKnownMacIp(context, remoteIp)
+            }
+
             val input = socket.getInputStream()
             val output = socket.getOutputStream()
 
@@ -253,6 +260,12 @@ class BeamDropServer(
                 }
                 method == "POST" && path == "/api/v1/tablet/action" -> {
                     handleTabletAction(input, output, headers)
+                }
+                method == "POST" && path == "/api/v1/notifications/reply" -> {
+                    handleNotificationReply(input, output, headers)
+                }
+                method == "GET" && path == "/api/v1/camera/snapshot" -> {
+                    handleCameraSnapshot(output, headers)
                 }
                 method == "POST" && path == "/api/v1/unpair" -> {
                     handleUnpair(input, output, headers)
@@ -641,6 +654,53 @@ class BeamDropServer(
     private fun writeJsonResponse(output: OutputStream, statusCode: Int, statusText: String, json: JSONObject) {
         val bytes = json.toString().toByteArray(Charsets.UTF_8)
         writeResponse(output, statusCode, statusText, "application/json", bytes)
+    }
+
+    private fun handleNotificationReply(input: InputStream, output: OutputStream, headers: Map<String, String>) {
+        if (!pairingManager.isAuthorized(headers["authorization"])) {
+            writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Unauthorized\"}".toByteArray())
+            return
+        }
+        val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
+        val body = if (contentLength > 0) {
+            val bytes = readExactBytes(input, contentLength)
+            String(bytes, Charsets.UTF_8)
+        } else ""
+
+        try {
+            val json = JSONObject(body)
+            val key = json.getString("key")
+            val replyText = json.getString("replyText")
+            val ok = com.beamdrop.receiver.service.BeamDropNotificationListenerService.sendReply(context, key, replyText)
+            if (ok) {
+                writeResponse(output, 200, "OK", "application/json", "{\"status\":\"SUCCESS\"}".toByteArray())
+            } else {
+                writeResponse(output, 400, "Bad Request", "application/json", "{\"error\":\"Failed to dispatch reply\"}".toByteArray())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling notification reply: ${e.message}")
+            writeResponse(output, 500, "Internal Server Error", "application/json", "{\"error\":\"${e.message}\"}".toByteArray())
+        }
+    }
+
+    private fun handleCameraSnapshot(output: OutputStream, headers: Map<String, String>) {
+        if (!pairingManager.isAuthorized(headers["authorization"])) {
+            writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Unauthorized\"}".toByteArray())
+            return
+        }
+        try {
+            val jpegBytes = kotlinx.coroutines.runBlocking {
+                com.beamdrop.receiver.camera.CameraHelper.captureSnapshot(context)
+            }
+            if (jpegBytes != null && jpegBytes.isNotEmpty()) {
+                writeResponse(output, 200, "OK", "image/jpeg", jpegBytes)
+            } else {
+                writeResponse(output, 503, "Service Unavailable", "application/json", "{\"error\":\"Camera unavailable or permission denied\"}".toByteArray())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Camera snapshot error: ${e.message}")
+            writeResponse(output, 500, "Internal Server Error", "application/json", "{\"error\":\"${e.message}\"}".toByteArray())
+        }
     }
 
     private fun writeResponse(output: OutputStream, statusCode: Int, statusText: String, contentType: String, body: ByteArray) {

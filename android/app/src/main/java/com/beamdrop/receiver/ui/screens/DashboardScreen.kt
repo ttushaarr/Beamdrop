@@ -1,5 +1,7 @@
 package com.beamdrop.receiver.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -23,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.beamdrop.receiver.model.ActiveTransferState
+import com.beamdrop.receiver.service.OutgoingTransferState
 import com.beamdrop.receiver.ui.MainViewModel
 
 @Composable
@@ -30,10 +33,21 @@ fun DashboardScreen(viewModel: MainViewModel) {
     val isRunning by viewModel.isServerRunning.collectAsState()
     val serverIp by viewModel.serverIp.collectAsState()
     val activeTransfer by viewModel.activeTransfer.collectAsState()
+    val outgoingTransfer by viewModel.outgoingTransfer.collectAsState()
+    val backupStatus by viewModel.backupStatus.collectAsState()
+    val targetMacIp by viewModel.targetMacIp.collectAsState()
     val history by viewModel.transferHistory.collectAsState()
     val isRinging by viewModel.isRinging.collectAsState()
     val tabletBattery by viewModel.tabletBattery.collectAsState()
     val macBattery by viewModel.macBattery.collectAsState()
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            viewModel.sendFilesToMac(uris)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -147,7 +161,7 @@ fun DashboardScreen(viewModel: MainViewModel) {
                 )
 
                 Text(
-                    text = "Zero-confirmation transfers active for paired MacBooks",
+                    text = if (!targetMacIp.isNullOrEmpty()) "Target Mac: $targetMacIp:8768 • Ready for drops" else "Zero-confirmation transfers active for paired MacBooks",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -234,9 +248,62 @@ fun DashboardScreen(viewModel: MainViewModel) {
             }
         }
 
-        // Active Transfer Banner
+        // Two-Way Actions Card: Send to Mac & Backup Camera Roll
+        ElevatedCard(
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Quick Send to MacBook",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { filePickerLauncher.launch("*/*") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Send Files", fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = { viewModel.backupCameraPhotos() },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Backup Photos", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                if (!backupStatus.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = backupStatus!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        // Active Incoming Transfer Banner
         activeTransfer?.let { transfer ->
             ActiveTransferCard(transfer)
+        }
+
+        // Active Outgoing Transfer Banner
+        outgoingTransfer?.let { transfer ->
+            OutgoingTransferCard(transfer)
         }
 
         // Live Clipboard Sync Card
@@ -366,16 +433,14 @@ fun DashboardScreen(viewModel: MainViewModel) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = item.fileName,
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    maxLines = 1
                                 )
                                 Text(
-                                    text = "${item.folder} • ${(item.fileSize / 1024)} KB",
+                                    text = "${item.folder} • ${(item.fileSize / 1024.0 / 1024.0).let { "%.2f MB".format(it) }}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                            }
-                            IconButton(onClick = { viewModel.openFile(item) }) {
-                                Icon(Icons.Default.OpenInNew, contentDescription = "Open")
                             }
                         }
                     }
@@ -399,7 +464,7 @@ fun ActiveTransferCard(transfer: ActiveTransferState) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = transfer.fileName,
+                    text = "📥 ${transfer.fileName}",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.weight(1f)
                 )
@@ -432,6 +497,59 @@ fun ActiveTransferCard(transfer: ActiveTransferState) {
                     text = "$speedText • Saving to ${transfer.destinationFolder}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun OutgoingTransferCard(transfer: OutgoingTransferState) {
+    ElevatedCard(
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "📤 ${transfer.fileName}",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = if (transfer.isFinished) "✓ Sent" else "${(transfer.progress * 100).toInt()}%",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = if (transfer.isFinished) Color(0xFF2E7D32) else MaterialTheme.colorScheme.tertiary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LinearProgressIndicator(
+                progress = { if (transfer.isFinished) 1f else transfer.progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val speedMb = transfer.speedBytesPerSec / (1024.0 * 1024.0)
+                val speedText = if (speedMb >= 1.0) "%.1f MB/s".format(speedMb) else "%.0f KB/s".format(transfer.speedBytesPerSec / 1024.0)
+                Text(
+                    text = if (transfer.isFinished) "Sent to Mac Downloads" else if (transfer.error != null) "Error: ${transfer.error}" else "$speedText • Sending to Mac...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
                 )
             }
         }

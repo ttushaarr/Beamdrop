@@ -35,4 +35,15 @@ public struct KdeNotification: Codable, Identifiable {
     public let title: String
     public let text: String
     public let timestamp: Int64
+    public let key: String?
+    public let canReply: Bool?
+
+    public init(appName: String, title: String, text: String, timestamp: Int64, key: String? = nil, canReply: Bool? = nil) {
+        self.appName = appName
+        self.title = title
+        self.text = text
+        self.timestamp = timestamp
+        self.key = key
+        self.canReply = canReply
+    }
 }

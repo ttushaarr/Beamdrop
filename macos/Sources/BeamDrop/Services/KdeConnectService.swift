@@ -9,6 +9,8 @@ public final class KdeConnectService: ObservableObject {
     @Published public var isConnected: Bool = false
     @Published public var isTabletRinging: Bool = false
     @Published public var recentNotifications: [KdeNotification] = []
+    @Published public var lastSnapshotURL: URL?
+    @Published public var isTakingSnapshot: Bool = false
     
     private var streamTask: Task<Void, Never>?
     private let fallbackToken = "e71cae5964a44470a759c097719e8cbeb124845567d0462ba93aaf096581e13f"
@@ -240,5 +242,75 @@ public final class KdeConnectService: ObservableObject {
         Task {
             _ = try? await URLSession.shared.data(for: req)
         }
+    }
+    
+    public func replyToNotification(key: String, text: String) async -> Bool {
+        let host = getTargetHost()
+        let port = getTargetPort()
+        let token = getActiveToken()
+        
+        guard let url = URL(string: "http://\(host):\(port)/api/v1/notifications/reply") else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 10
+        
+        let body = ["key": key, "replyText": text]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            if let http = resp as? HTTPURLResponse, http.statusCode == 200 {
+                print("[KDE] Successfully replied to notification \(key)")
+                return true
+            }
+        } catch {
+            print("[KDE] Error sending notification reply: \(error)")
+        }
+        return false
+    }
+    
+    public func captureContinuitySnapshot() async throws -> URL? {
+        let host = getTargetHost()
+        let port = getTargetPort()
+        let token = getActiveToken()
+        
+        guard let url = URL(string: "http://\(host):\(port)/api/v1/camera/snapshot") else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 15
+        
+        await MainActor.run { self.isTakingSnapshot = true }
+        defer {
+            Task { @MainActor in self.isTakingSnapshot = false }
+        }
+        
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200, !data.isEmpty else {
+            throw NSError(domain: "BeamDropCamera", code: (resp as? HTTPURLResponse)?.statusCode ?? -1, userInfo: [NSLocalizedDescriptionKey: "Failed to capture snapshot from Android device"])
+        }
+        
+        let desktopDir = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        let timeStr = formatter.string(from: Date())
+        let destURL = desktopDir.appendingPathComponent("BeamDrop_Snapshot_\(timeStr).jpg")
+        
+        try data.write(to: destURL)
+        
+        await MainActor.run {
+            self.lastSnapshotURL = destURL
+            
+            let script = """
+            display notification "Saved to Desktop: \(destURL.lastPathComponent)" with title "BeamDrop Continuity Camera" subtitle "Snapshot Captured"
+            """
+            var err: NSDictionary?
+            NSAppleScript(source: script)?.executeAndReturnError(&err)
+            NSSound(named: "Glass")?.play()
+        }
+        
+        return destURL
     }
 }

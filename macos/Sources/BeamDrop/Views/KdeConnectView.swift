@@ -1,12 +1,10 @@
 import SwiftUI
 import AppKit
 
-import SwiftUI
-import AppKit
-
 public class KdeConnectViewModel: ObservableObject {
     @Published public var urlToOpen: String = ""
     @Published public var showUrlSuccess: Bool = false
+    @Published public var snapshotError: String? = nil
     public init() {}
 }
 
@@ -31,9 +29,9 @@ public struct KdeConnectView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(kde.isConnected ? "KDE Connect Stream Active" : "Connecting to Moto Pad...")
+                    Text(kde.isConnected ? "KDE Connect Stream Active" : "Connecting to Android Device...")
                         .font(.system(size: 15, weight: .bold))
-                    Text(kde.isConnected ? "Bidirectional remote control, notifications, & battery sync active" : "Ensure tablet is on same Wi-Fi with BeamDrop open")
+                    Text(kde.isConnected ? "Bidirectional remote control, notifications, camera & battery sync active" : "Ensure tablet is on same Wi-Fi with BeamDrop open")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
@@ -66,7 +64,7 @@ public struct KdeConnectView: View {
                     HStack {
                         Image(systemName: "ipad.landscape")
                             .foregroundColor(.blue)
-                        Text("Tablet Battery")
+                        Text("Android Battery")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.secondary)
                         Spacer()
@@ -100,7 +98,7 @@ public struct KdeConnectView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Image(systemName: "laptopcomputer")
-                            .foregroundColor(.indigo)
+                            .foregroundColor(.purple)
                         Text("MacBook Battery")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.secondary)
@@ -121,7 +119,7 @@ public struct KdeConnectView: View {
                                 .foregroundColor(.secondary)
                         }
                     } else {
-                        Text("Detecting...")
+                        Text("--%")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.secondary)
                     }
@@ -132,8 +130,68 @@ public struct KdeConnectView: View {
                 .cornerRadius(12)
             }
             
-            // Find My Device (Ring Tablet) Action Card
+            // Continuity Camera Card
             VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "camera.fill")
+                        .foregroundColor(.cyan)
+                    Text("Continuity Camera / Live Capture")
+                        .font(.system(size: 13, weight: .bold))
+                    Spacer()
+                }
+                
+                HStack(spacing: 12) {
+                    Button(action: {
+                        Task {
+                            vm.snapshotError = nil
+                            do {
+                                _ = try await kde.captureContinuitySnapshot()
+                            } catch {
+                                await MainActor.run {
+                                    vm.snapshotError = error.localizedDescription
+                                }
+                            }
+                        }
+                    }) {
+                        HStack {
+                            if kde.isTakingSnapshot {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                Text("Snapping...")
+                            } else {
+                                Image(systemName: "camera.aperture")
+                                Text("Take Photo from Android")
+                            }
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(kde.isTakingSnapshot)
+                    
+                    if let snapshotURL = kde.lastSnapshotURL {
+                        Button("Reveal in Finder") {
+                            NSWorkspace.shared.activateFileViewerSelecting([snapshotURL])
+                        }
+                        .buttonStyle(.bordered)
+                        
+                        Text("Saved: \(snapshotURL.lastPathComponent)")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                
+                if let err = vm.snapshotError {
+                    Text("Error: \(err)")
+                        .font(.system(size: 11))
+                        .foregroundColor(.red)
+                }
+            }
+            .padding(14)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(12)
+            
+            // Find My Device (Ring Tablet) Card
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Image(systemName: "speaker.wave.3.fill")
                         .foregroundColor(.red)
@@ -142,18 +200,19 @@ public struct KdeConnectView: View {
                     Spacer()
                 }
                 
-                Text("Play a loud alarm on your Moto Pad 60 Pro to locate it, even if tablet sound is muted.")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                
-                HStack(spacing: 12) {
+                HStack {
+                    Text("Lost your tablet under a couch or in another room? Sound full-volume alarm.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
                     if kde.isTabletRinging {
                         Button(action: { kde.stopTabletRinging() }) {
                             HStack {
                                 Image(systemName: "stop.circle.fill")
-                                Text("Stop Ringing Tablet")
+                                Text("Stop Alarm")
                             }
-                            .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.red)
@@ -161,9 +220,8 @@ public struct KdeConnectView: View {
                         Button(action: { kde.ringTablet() }) {
                             HStack {
                                 Image(systemName: "bell.badge.fill")
-                                Text("Ring Moto Pad 60 Pro")
+                                Text("Ring Android Device")
                             }
-                            .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.red)
@@ -212,7 +270,7 @@ public struct KdeConnectView: View {
             .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(12)
             
-            // Mirrored Android Notifications Feed
+            // Mirrored Android Notifications Feed with Quick Reply
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Image(systemName: "bell.fill")
@@ -245,36 +303,7 @@ public struct KdeConnectView: View {
                 } else {
                     VStack(spacing: 8) {
                         ForEach(kde.recentNotifications.prefix(5)) { notif in
-                            HStack(alignment: .top, spacing: 10) {
-                                Circle()
-                                    .fill(Color.purple.opacity(0.2))
-                                    .frame(width: 24, height: 24)
-                                    .overlay(
-                                        Image(systemName: "app.badge.fill")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(.purple)
-                                    )
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack {
-                                        Text(notif.appName)
-                                            .font(.system(size: 11, weight: .bold))
-                                        Spacer()
-                                        Text(Date(timeIntervalSince1970: TimeInterval(notif.timestamp / 1000)), style: .time)
-                                            .font(.system(size: 9))
-                                            .foregroundColor(.secondary)
-                                    }
-                                    Text(notif.title)
-                                        .font(.system(size: 11, weight: .semibold))
-                                    Text(notif.text)
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(2)
-                                }
-                            }
-                            .padding(10)
-                            .background(Color(NSColor.windowBackgroundColor))
-                            .cornerRadius(8)
+                            NotificationRowView(notif: notif, kde: kde)
                         }
                     }
                 }
@@ -283,5 +312,87 @@ public struct KdeConnectView: View {
             .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(12)
         }
+    }
+}
+
+public struct NotificationRowView: View {
+    let notif: KdeNotification
+    let kde: KdeConnectService
+    @State private var replyText: String = ""
+    @State private var isSendingReply: Bool = false
+    @State private var replySent: Bool = false
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 10) {
+                Circle()
+                    .fill(Color.purple.opacity(0.2))
+                    .frame(width: 24, height: 24)
+                    .overlay(
+                        Image(systemName: "app.badge.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.purple)
+                    )
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text(notif.appName)
+                            .font(.system(size: 11, weight: .bold))
+                        Spacer()
+                        Text(Date(timeIntervalSince1970: TimeInterval(notif.timestamp / 1000)), style: .time)
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary)
+                    }
+                    Text(notif.title)
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(notif.text)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            
+            // Inline Quick Reply for notifications supporting RemoteInput
+            if notif.canReply == true, let key = notif.key, !key.isEmpty {
+                HStack(spacing: 8) {
+                    TextField("Quick Reply...", text: $replyText)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 11))
+                    
+                    Button(action: {
+                        let text = replyText.trimmingCharacters(in: .whitespaces)
+                        guard !text.isEmpty else { return }
+                        isSendingReply = true
+                        Task {
+                            let ok = await kde.replyToNotification(key: key, text: text)
+                            await MainActor.run {
+                                isSendingReply = false
+                                if ok {
+                                    replySent = true
+                                    replyText = ""
+                                }
+                            }
+                        }
+                    }) {
+                        if isSendingReply {
+                            ProgressView().scaleEffect(0.6)
+                        } else if replySent {
+                            Image(systemName: "checkmark")
+                                .foregroundColor(.green)
+                        } else {
+                            Text("Reply")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(replyText.trimmingCharacters(in: .whitespaces).isEmpty || isSendingReply)
+                }
+                .padding(.leading, 34)
+            }
+        }
+        .padding(10)
+        .background(Color(NSColor.windowBackgroundColor))
+        .cornerRadius(8)
     }
 }

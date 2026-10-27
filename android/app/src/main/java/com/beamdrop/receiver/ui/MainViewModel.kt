@@ -58,6 +58,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isRinging = MutableStateFlow(false)
     val isRinging = _isRinging.asStateFlow()
 
+    val outgoingTransfer = com.beamdrop.receiver.service.FileSenderManager.outgoingTransfer
+    val targetMacIp = com.beamdrop.receiver.service.FileSenderManager.lastKnownMacIp
+
+    private val _backupStatus = MutableStateFlow<String?>(null)
+    val backupStatus = _backupStatus.asStateFlow()
+
     private var service: FileReceiverForegroundService? = null
 
     private val serviceConnection = object : ServiceConnection {
@@ -192,6 +198,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             getApplication<Application>().startActivity(intent)
         } catch (_: Exception) {}
+    }
+
+    fun sendFilesToMac(uris: List<Uri>) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val mac = com.beamdrop.receiver.service.FileSenderManager.resolveTargetMac(app, _serverIp.value)
+            if (mac.isNullOrEmpty()) {
+                _backupStatus.value = "Error: Mac receiver not detected on subnet"
+                return@launch
+            }
+            com.beamdrop.receiver.service.FileSenderManager.sendMultipleUrisToMac(app, uris, mac)
+        }
+    }
+
+    fun backupCameraPhotos() {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            _backupStatus.value = "Backing up photos to Mac..."
+            val mac = com.beamdrop.receiver.service.FileSenderManager.resolveTargetMac(app, _serverIp.value)
+            if (mac.isNullOrEmpty()) {
+                _backupStatus.value = "Error: Mac receiver not found on subnet"
+                return@launch
+            }
+            val count = com.beamdrop.receiver.service.FileSenderManager.backupRecentCameraPhotos(app, mac)
+            _backupStatus.value = "Successfully synced $count photos to Mac!"
+        }
+    }
+
+    fun setTargetMacIp(ip: String) {
+        com.beamdrop.receiver.service.FileSenderManager.setLastKnownMacIp(getApplication(), ip)
     }
 
     override fun onCleared() {
