@@ -37,13 +37,17 @@ public struct KdeNotification: Codable, Identifiable {
     public let timestamp: Int64
     public let key: String?
     public let canReply: Bool?
+    public let isCall: Bool?
+    public let phoneNumber: String?
 
-    public init(appName: String, title: String, text: String, timestamp: Int64, key: String? = nil, canReply: Bool? = nil) {
+    public init(appName: String, title: String, text: String, timestamp: Int64, key: String? = nil, canReply: Bool? = nil, isCall: Bool? = false, phoneNumber: String? = nil) {
         self.appName = appName
         self.title = title
         self.text = text
         self.timestamp = timestamp
         self.key = key
         self.canReply = canReply
+        self.isCall = isCall
+        self.phoneNumber = phoneNumber
     }
 }

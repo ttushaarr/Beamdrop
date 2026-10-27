@@ -328,6 +328,182 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         service?.syncTextToMac(text)
     }
 
+    // MARK: - Wireless ADB & Custom Script Launchers & Webcam
+
+    data class MacScriptItem(
+        val id: String,
+        val name: String,
+        val command: String,
+        val icon: String
+    )
+
+    private val _macScripts = MutableStateFlow<List<MacScriptItem>>(emptyList())
+    val macScripts = _macScripts.asStateFlow()
+
+    private val _scriptOutput = MutableStateFlow<String>("")
+    val scriptOutput = _scriptOutput.asStateFlow()
+
+    private val _isRunningScript = MutableStateFlow(false)
+    val isRunningScript = _isRunningScript.asStateFlow()
+
+    fun fetchMacScripts() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val app = getApplication<Application>()
+            val mac = com.beamdrop.receiver.service.FileSenderManager.resolveTargetMac(app, _serverIp.value) ?: return@launch
+            try {
+                val url = java.net.URL("http://$mac:8768/api/v1/scripts/list")
+                val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                    connectTimeout = 3000
+                    readTimeout = 3000
+                }
+                if (conn.responseCode == 200) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    val array = org.json.JSONArray(body)
+                    val list = mutableListOf<MacScriptItem>()
+                    for (i in 0 until array.length()) {
+                        val obj = array.getJSONObject(i)
+                        list.add(
+                            MacScriptItem(
+                                id = obj.getString("id"),
+                                name = obj.getString("name"),
+                                command = obj.getString("command"),
+                                icon = obj.optString("icon", "⚡")
+                            )
+                        )
+                    }
+                    _macScripts.value = list
+                }
+                conn.disconnect()
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Failed to fetch scripts: ${e.message}")
+            }
+        }
+    }
+
+    fun runMacScript(id: String) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val app = getApplication<Application>()
+            val mac = com.beamdrop.receiver.service.FileSenderManager.resolveTargetMac(app, _serverIp.value) ?: return@launch
+            _isRunningScript.value = true
+            _scriptOutput.value = "Executing script on Mac ($mac)..."
+            try {
+                val url = java.net.URL("http://$mac:8768/api/v1/scripts/run")
+                val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    doOutput = true
+                    connectTimeout = 5000
+                    readTimeout = 30000
+                    setRequestProperty("Content-Type", "application/json")
+                }
+                val reqBody = org.json.JSONObject().apply { put("id", id) }.toString()
+                conn.outputStream.write(reqBody.toByteArray())
+                val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
+                val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
+                val json = if (body.isNotEmpty()) org.json.JSONObject(body) else org.json.JSONObject()
+                val out = json.optString("output", body)
+                val code = json.optInt("exitCode", conn.responseCode)
+                _scriptOutput.value = "Exit Code: $code\n\n$out"
+                conn.disconnect()
+            } catch (e: Exception) {
+                _scriptOutput.value = "Execution error: ${e.message}"
+            } finally {
+                _isRunningScript.value = false
+            }
+        }
+    }
+
+    fun createMacScript(name: String, command: String, icon: String) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val app = getApplication<Application>()
+            val mac = com.beamdrop.receiver.service.FileSenderManager.resolveTargetMac(app, _serverIp.value) ?: return@launch
+            try {
+                val url = java.net.URL("http://$mac:8768/api/v1/scripts/save")
+                val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    doOutput = true
+                    connectTimeout = 3000
+                    readTimeout = 3000
+                    setRequestProperty("Content-Type", "application/json")
+                }
+                val reqBody = org.json.JSONObject().apply {
+                    put("name", name)
+                    put("command", command)
+                    put("icon", icon)
+                }.toString()
+                conn.outputStream.write(reqBody.toByteArray())
+                conn.responseCode
+                conn.disconnect()
+                fetchMacScripts()
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Failed to save script: ${e.message}")
+            }
+        }
+    }
+
+    private val _adbStatus = MutableStateFlow<String>("")
+    val adbStatus = _adbStatus.asStateFlow()
+    private val _isAdbConnecting = MutableStateFlow(false)
+    val isAdbConnecting = _isAdbConnecting.asStateFlow()
+
+    fun connectMacAdb(pairingPort: Int? = null, pairingCode: String? = null) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val app = getApplication<Application>()
+            val mac = com.beamdrop.receiver.service.FileSenderManager.resolveTargetMac(app, _serverIp.value) ?: return@launch
+            _isAdbConnecting.value = true
+            _adbStatus.value = "Connecting Mac ADB to ${_serverIp.value}..."
+            try {
+                val url = java.net.URL("http://$mac:8768/api/v1/adb/connect")
+                val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    doOutput = true
+                    connectTimeout = 5000
+                    readTimeout = 15000
+                    setRequestProperty("Content-Type", "application/json")
+                }
+                val req = org.json.JSONObject().apply {
+                    put("host", _serverIp.value)
+                    put("port", 5555)
+                    if (pairingPort != null && !pairingCode.isNullOrEmpty()) {
+                        put("pairingPort", pairingPort)
+                        put("pairingCode", pairingCode)
+                    }
+                }
+                conn.outputStream.write(req.toString().toByteArray())
+                val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
+                val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
+                val json = if (body.isNotEmpty()) org.json.JSONObject(body) else org.json.JSONObject()
+                val msg = json.optString("message", body)
+                _adbStatus.value = msg
+                conn.disconnect()
+            } catch (e: Exception) {
+                _adbStatus.value = "ADB Connect failed: ${e.message}"
+            } finally {
+                _isAdbConnecting.value = false
+            }
+        }
+    }
+
+    val isWebcamStreaming = com.beamdrop.receiver.camera.WebcamManager.isStreaming
+    val isWebcamBackCamera = com.beamdrop.receiver.camera.WebcamManager.isBackCamera
+    val isWebcamTorchOn = com.beamdrop.receiver.camera.WebcamManager.isTorchOn
+    val webcamFps = com.beamdrop.receiver.camera.WebcamManager.fps
+
+    fun startWebcam() {
+        com.beamdrop.receiver.camera.WebcamManager.startStreaming(getApplication())
+    }
+
+    fun stopWebcam() {
+        com.beamdrop.receiver.camera.WebcamManager.stopStreaming()
+    }
+
+    fun toggleWebcamCamera() {
+        com.beamdrop.receiver.camera.WebcamManager.toggleCamera(getApplication())
+    }
+
+    fun toggleWebcamTorch() {
+        com.beamdrop.receiver.camera.WebcamManager.toggleTorch(getApplication())
+    }
+
     override fun onCleared() {
         super.onCleared()
         if (_isServiceBound.value) {

@@ -97,6 +97,9 @@ public final class MacReceiverService: ObservableObject {
                                         } else if firstLine.contains("/api/v1/screen/frame") {
                                             self.handleScreenFrame(connection: connection)
                                             return
+                                        } else if firstLine.contains("/api/v1/scripts/list") {
+                                            self.handleScriptsList(connection: connection)
+                                            return
                                         }
                                     } else if firstLine.hasPrefix("POST ") {
                                         if firstLine.contains("/api/v1/mac/unlock") {
@@ -105,6 +108,22 @@ public final class MacReceiverService: ObservableObject {
                                         } else if firstLine.contains("/api/v1/screen/touch") {
                                             let body = buffer.count > bodyStartIndex ? buffer.subdata(in: bodyStartIndex..<buffer.count) : Data()
                                             self.handleScreenTouch(bodyData: body, connection: connection)
+                                            return
+                                        } else if firstLine.contains("/api/v1/adb/connect") {
+                                            let body = buffer.count > bodyStartIndex ? buffer.subdata(in: bodyStartIndex..<buffer.count) : Data()
+                                            self.handleAdbConnect(bodyData: body, connection: connection)
+                                            return
+                                        } else if firstLine.contains("/api/v1/scripts/run") {
+                                            let body = buffer.count > bodyStartIndex ? buffer.subdata(in: bodyStartIndex..<buffer.count) : Data()
+                                            self.handleScriptRun(bodyData: body, connection: connection)
+                                            return
+                                        } else if firstLine.contains("/api/v1/scripts/save") {
+                                            let body = buffer.count > bodyStartIndex ? buffer.subdata(in: bodyStartIndex..<buffer.count) : Data()
+                                            self.handleScriptSave(bodyData: body, connection: connection)
+                                            return
+                                        } else if firstLine.contains("/api/v1/scripts/delete") {
+                                            let body = buffer.count > bodyStartIndex ? buffer.subdata(in: bodyStartIndex..<buffer.count) : Data()
+                                            self.handleScriptDelete(bodyData: body, connection: connection)
                                             return
                                         }
                                     }
@@ -255,6 +274,82 @@ public final class MacReceiverService: ObservableObject {
             }
         }
         sendHttpResponse(connection: connection, statusCode: 200, body: "{\"status\":\"OK\"}")
+    }
+    
+    private func handleAdbConnect(bodyData: Data, connection: NWConnection) {
+        Task {
+            var host = ""
+            var port = 5555
+            if let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any] {
+                host = (json["ip"] as? String) ?? ""
+                port = (json["port"] as? Int) ?? 5555
+            }
+            if host.isEmpty {
+                host = DeviceDiscoveryService.shared.selectedDevice?.host ?? ""
+            }
+            guard !host.isEmpty else {
+                sendHttpResponse(connection: connection, statusCode: 400, body: "{\"success\":false,\"message\":\"No host IP provided\"}")
+                return
+            }
+            let (success, message) = await AdbService.shared.connect(host: host, port: port)
+            let safeMsg = message.replacingOccurrences(of: "\"", with: "\\\"").replacingOccurrences(of: "\n", with: " ")
+            sendHttpResponse(connection: connection, statusCode: 200, body: "{\"success\":\(success),\"message\":\"\(safeMsg)\"}")
+        }
+    }
+    
+    private func handleScriptsList(connection: NWConnection) {
+        CustomScriptService.shared.loadScripts()
+        let scripts = CustomScriptService.shared.scripts
+        if let data = try? JSONEncoder().encode(scripts), let jsonStr = String(data: data, encoding: .utf8) {
+            sendHttpResponse(connection: connection, statusCode: 200, body: jsonStr)
+        } else {
+            sendHttpResponse(connection: connection, statusCode: 200, body: "[]")
+        }
+    }
+    
+    private func handleScriptRun(bodyData: Data, connection: NWConnection) {
+        Task {
+            var scriptId: String?
+            var rawCommand: String?
+            if let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any] {
+                scriptId = (json["scriptId"] as? String) ?? (json["id"] as? String)
+                rawCommand = json["command"] as? String
+            }
+            
+            let (code, output): (Int32, String)
+            if let id = scriptId, !id.isEmpty {
+                (code, output) = await CustomScriptService.shared.executeScript(id: id)
+            } else if let cmd = rawCommand, !cmd.isEmpty {
+                (code, output) = await CustomScriptService.shared.executeRawCommand(cmd)
+            } else {
+                (code, output) = (1, "No scriptId or command provided")
+            }
+            
+            let safeOut = output.replacingOccurrences(of: "\\", with: "\\\\")
+                                .replacingOccurrences(of: "\"", with: "\\\"")
+                                .replacingOccurrences(of: "\n", with: "\\n")
+                                .replacingOccurrences(of: "\r", with: "")
+            sendHttpResponse(connection: connection, statusCode: 200, body: "{\"exitCode\":\(code),\"output\":\"\(safeOut)\"}")
+        }
+    }
+    
+    private func handleScriptSave(bodyData: Data, connection: NWConnection) {
+        if let script = try? JSONDecoder().decode(CustomScript.self, from: bodyData) {
+            CustomScriptService.shared.addOrUpdateScript(script)
+            sendHttpResponse(connection: connection, statusCode: 200, body: "{\"status\":\"SAVED\"}")
+        } else {
+            sendHttpResponse(connection: connection, statusCode: 400, body: "{\"error\":\"Malformed script JSON\"}")
+        }
+    }
+    
+    private func handleScriptDelete(bodyData: Data, connection: NWConnection) {
+        if let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+           let id = json["id"] as? String {
+            CustomScriptService.shared.deleteScript(id: id)
+            sendHttpResponse(connection: connection, statusCode: 200, body: "{\"status\":\"DELETED\"}")
+        } else {
+            sendHttpResponse(connection: connection, statusCode: 400, body: "{\"error\":\"Missing id\"}")
+        }
     }
     
     private func resolveDestinationDirectory(subfolder: String) -> URL {

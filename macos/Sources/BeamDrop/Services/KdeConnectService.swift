@@ -9,6 +9,7 @@ public final class KdeConnectService: ObservableObject {
     @Published public var isConnected: Bool = false
     @Published public var isTabletRinging: Bool = false
     @Published public var recentNotifications: [KdeNotification] = []
+    @Published public var activeIncomingCall: KdeNotification?
     @Published public var lastSnapshotURL: URL?
     @Published public var isTakingSnapshot: Bool = false
     
@@ -140,15 +141,31 @@ public final class KdeConnectService: ObservableObject {
                 }
             }
             
+        case "call":
+            if let notif = try? JSONDecoder().decode(KdeNotification.self, from: data) {
+                await MainActor.run {
+                    self.activeIncomingCall = notif
+                    self.recentNotifications.insert(notif, at: 0)
+                }
+                self.showIncomingCallNotification(notif)
+            }
+            
         case "notification":
             if let notif = try? JSONDecoder().decode(KdeNotification.self, from: data) {
                 await MainActor.run {
+                    if notif.isCall == true {
+                        self.activeIncomingCall = notif
+                    }
                     self.recentNotifications.insert(notif, at: 0)
                     if self.recentNotifications.count > 50 {
                         self.recentNotifications.removeLast()
                     }
                 }
-                self.showMacNotification(notif)
+                if notif.isCall == true {
+                    self.showIncomingCallNotification(notif)
+                } else {
+                    self.showMacNotification(notif)
+                }
             }
             
         case "clipboard":
@@ -159,6 +176,19 @@ public final class KdeConnectService: ObservableObject {
             
         default:
             break
+        }
+    }
+    
+    private func showIncomingCallNotification(_ notif: KdeNotification) {
+        let titleEsc = notif.title.replacingOccurrences(of: "\"", with: "\\\"")
+        let caller = notif.phoneNumber?.isEmpty == false ? notif.phoneNumber! : titleEsc
+        let script = """
+        display notification "Incoming call on Android phone" with title "📞 Call from \(titleEsc)" subtitle "\(caller)" sound name "Glass"
+        """
+        DispatchQueue.global(qos: .userInitiated).async {
+            var error: NSDictionary?
+            NSAppleScript(source: script)?.executeAndReturnError(&error)
+            NSSound(named: "Glass")?.play()
         }
     }
     
@@ -311,5 +341,90 @@ public final class KdeConnectService: ObservableObject {
         }
         
         return destURL
+    }
+
+    // MARK: - Incoming Call & SMS Alerts Actions
+
+    @discardableResult
+    public func declineCall(key: String? = nil, message: String? = nil, phoneNumber: String? = nil) async -> Bool {
+        let host = getTargetHost()
+        let port = getTargetPort()
+        let token = getActiveToken()
+
+        guard let url = URL(string: "http://\(host):\(port)/api/v1/phone/decline-call") else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 5
+
+        var body: [String: Any] = [:]
+        if let key = key ?? activeIncomingCall?.key { body["key"] = key }
+        if let msg = message { body["message"] = msg }
+        if let phone = phoneNumber ?? activeIncomingCall?.phoneNumber { body["phoneNumber"] = phone }
+
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            if let http = resp as? HTTPURLResponse, http.statusCode == 200 {
+                await MainActor.run {
+                    self.activeIncomingCall = nil
+                }
+                return true
+            }
+        } catch {}
+        return false
+    }
+
+    @discardableResult
+    public func muteRinger() async -> Bool {
+        let host = getTargetHost()
+        let port = getTargetPort()
+        let token = getActiveToken()
+
+        guard let url = URL(string: "http://\(host):\(port)/api/v1/phone/mute") else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 5
+
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            return (resp as? HTTPURLResponse)?.statusCode == 200
+        } catch {
+            return false
+        }
+    }
+
+    // MARK: - Wireless HD Webcam Controls
+
+    public func getWebcamStreamURL() -> URL? {
+        let host = getTargetHost()
+        let port = getTargetPort()
+        return URL(string: "http://\(host):\(port)/api/v1/webcam/stream")
+    }
+
+    public func controlWebcam(action: String) async -> [String: Any]? {
+        let host = getTargetHost()
+        let port = getTargetPort()
+        let token = getActiveToken()
+
+        guard let url = URL(string: "http://\(host):\(port)/api/v1/webcam/control") else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 5
+
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["action": action])
+
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            if let http = resp as? HTTPURLResponse, http.statusCode == 200 {
+                return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            }
+        } catch {}
+        return nil
     }
 }

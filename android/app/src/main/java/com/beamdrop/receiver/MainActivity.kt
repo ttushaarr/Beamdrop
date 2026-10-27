@@ -32,10 +32,12 @@ import com.beamdrop.receiver.ui.screens.MediaControlScreen
 import com.beamdrop.receiver.ui.screens.PairingScreen
 import com.beamdrop.receiver.ui.screens.PresentationScreen
 import com.beamdrop.receiver.ui.screens.RemoteCommandsScreen
+import com.beamdrop.receiver.ui.screens.ScriptLauncherScreen
 import com.beamdrop.receiver.ui.screens.SecondScreenView
 import com.beamdrop.receiver.ui.screens.SettingsScreen
 import com.beamdrop.receiver.ui.screens.SketchPadScreen
 import com.beamdrop.receiver.ui.screens.TrackpadScreen
+import com.beamdrop.receiver.ui.screens.WebcamScreen
 import com.beamdrop.receiver.ui.theme.BeamDropTheme
 
 class MainActivity : ComponentActivity() {
@@ -186,18 +188,22 @@ fun DeviceAndSettingsScreen(viewModel: MainViewModel) {
         ScrollableTabRow(selectedTabIndex = subTab, edgePadding = 12.dp) {
             Tab(selected = subTab == 0, onClick = { subTab = 0 }, text = { Text("Pairing & QR") })
             Tab(selected = subTab == 1, onClick = { subTab = 1 }, text = { Text("🤖 AI Solver") })
-            Tab(selected = subTab == 2, onClick = { subTab = 2 }, text = { Text("✍️ Sketch Pad") })
-            Tab(selected = subTab == 3, onClick = { subTab = 3 }, text = { Text("🖥️ Sidecar Display") })
-            Tab(selected = subTab == 4, onClick = { subTab = 4 }, text = { Text("History") })
-            Tab(selected = subTab == 5, onClick = { subTab = 5 }, text = { Text("Settings") })
+            Tab(selected = subTab == 2, onClick = { subTab = 2 }, text = { Text("📹 HD Webcam") })
+            Tab(selected = subTab == 3, onClick = { subTab = 3 }, text = { Text("🚀 Scripts & ADB") })
+            Tab(selected = subTab == 4, onClick = { subTab = 4 }, text = { Text("✍️ Sketch Pad") })
+            Tab(selected = subTab == 5, onClick = { subTab = 5 }, text = { Text("🖥️ Sidecar Display") })
+            Tab(selected = subTab == 6, onClick = { subTab = 6 }, text = { Text("History") })
+            Tab(selected = subTab == 7, onClick = { subTab = 7 }, text = { Text("Settings") })
         }
         when (subTab) {
             0 -> PairingScreen(viewModel = viewModel)
             1 -> AiSolverScreen(viewModel = viewModel)
-            2 -> SketchPadScreen(viewModel = viewModel)
-            3 -> SecondScreenView(viewModel = viewModel)
-            4 -> HistoryScreen(viewModel = viewModel)
-            5 -> SettingsScreen(viewModel = viewModel)
+            2 -> WebcamScreen(viewModel = viewModel)
+            3 -> ScriptLauncherScreen(viewModel = viewModel)
+            4 -> SketchPadScreen(viewModel = viewModel)
+            5 -> SecondScreenView(viewModel = viewModel)
+            6 -> HistoryScreen(viewModel = viewModel)
+            7 -> SettingsScreen(viewModel = viewModel)
         }
     }
 }

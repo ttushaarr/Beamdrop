@@ -35,5 +35,7 @@ data class MirroredNotification(
     val text: String,
     val timestamp: Long = System.currentTimeMillis(),
     val key: String = "",
-    val canReply: Boolean = false
+    val canReply: Boolean = false,
+    val isCall: Boolean = false,
+    val phoneNumber: String? = null
 )

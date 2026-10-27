@@ -184,8 +184,13 @@ class BeamDropServer(
             put("timestamp", notif.timestamp)
             put("key", notif.key)
             put("canReply", notif.canReply)
+            put("isCall", notif.isCall)
+            put("phoneNumber", notif.phoneNumber ?: "")
         }
         broadcastEvent("notification", json)
+        if (notif.isCall) {
+            broadcastEvent("call", json)
+        }
     }
 
     fun broadcastOpenUrlOnMac(url: String) {
@@ -199,6 +204,7 @@ class BeamDropServer(
 
     private fun handleClient(socket: Socket) {
         var isSseConnection = false
+        var isWebcamStream = false
         var streamInput: InputStream? = null
         val headers = mutableMapOf<String, String>()
         try {
@@ -293,6 +299,21 @@ class BeamDropServer(
                 method == "POST" && path == "/api/v1/audio/play" -> {
                     handleAudioPlay(output, headers)
                 }
+                method == "GET" && path == "/api/v1/webcam/stream" -> {
+                    isWebcamStream = handleWebcamStream(output, headers, socket)
+                }
+                method == "GET" && path == "/api/v1/webcam/frame" -> {
+                    handleWebcamFrame(output, headers)
+                }
+                method == "POST" && path == "/api/v1/webcam/control" -> {
+                    handleWebcamControl(input, output, headers)
+                }
+                method == "POST" && path == "/api/v1/phone/decline-call" -> {
+                    handlePhoneDeclineCall(input, output, headers)
+                }
+                method == "POST" && path == "/api/v1/phone/mute" -> {
+                    handlePhoneMute(output, headers)
+                }
                 method == "POST" && path == "/api/v1/unpair" -> {
                     handleUnpair(input, output, headers)
                 }
@@ -303,7 +324,7 @@ class BeamDropServer(
         } catch (e: Exception) {
             Log.e(TAG, "Error handling client request: ${e.message}")
         } finally {
-            if (!isSseConnection) {
+            if (!isSseConnection && !isWebcamStream) {
                 try {
                     // Drain any remaining unread bytes from socket input to avoid TCP RST
                     val cl = headers["content-length"]?.toIntOrNull() ?: 0
@@ -919,6 +940,136 @@ class BeamDropServer(
         } catch (e: Exception) {
             writeResponse(output, 500, "Error", "application/json", "{\"error\":\"${e.message}\"}".toByteArray())
         }
+    }
+
+    private fun handleWebcamStream(output: OutputStream, headers: Map<String, String>, socket: Socket): Boolean {
+        if (!pairingManager.isAuthorized(headers["authorization"])) {
+            writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Not paired\"}".toByteArray())
+            return false
+        }
+
+        // Auto-start streaming if not already running
+        if (!com.beamdrop.receiver.camera.WebcamManager.isStreaming.value) {
+            com.beamdrop.receiver.camera.WebcamManager.startStreaming(context)
+        }
+
+        val header = "HTTP/1.1 200 OK\r\n" +
+                "Connection: close\r\n" +
+                "Server: BeamDrop/1.0\r\n" +
+                "Cache-Control: no-cache, no-store, must-revalidate\r\n" +
+                "Pragma: no-cache\r\n" +
+                "Content-Type: multipart/x-mixed-replace; boundary=--beamdropframe\r\n" +
+                "Access-Control-Allow-Origin: *\r\n\r\n"
+        output.write(header.toByteArray(Charsets.US_ASCII))
+        output.flush()
+
+        val frameQueue = java.util.concurrent.LinkedBlockingQueue<ByteArray>(5)
+        val listener: (ByteArray) -> Unit = { frame ->
+            if (frameQueue.remainingCapacity() == 0) {
+                frameQueue.poll() // drop old frame to maintain real-time low latency
+            }
+            frameQueue.offer(frame)
+        }
+
+        com.beamdrop.receiver.camera.WebcamManager.addFrameListener(listener)
+
+        try {
+            while (!socket.isClosed && socket.isConnected) {
+                val frame = frameQueue.poll(500, java.util.concurrent.TimeUnit.MILLISECONDS) ?: continue
+                val partHeader = "--beamdropframe\r\n" +
+                        "Content-Type: image/jpeg\r\n" +
+                        "Content-Length: ${frame.size}\r\n\r\n"
+                output.write(partHeader.toByteArray(Charsets.US_ASCII))
+                output.write(frame)
+                output.write("\r\n".toByteArray(Charsets.US_ASCII))
+                output.flush()
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Webcam stream ended: ${e.message}")
+        } finally {
+            com.beamdrop.receiver.camera.WebcamManager.removeFrameListener(listener)
+            try { socket.close() } catch (_: Exception) {}
+        }
+        return true
+    }
+
+    private fun handleWebcamFrame(output: OutputStream, headers: Map<String, String>) {
+        if (!pairingManager.isAuthorized(headers["authorization"])) {
+            writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Not paired\"}".toByteArray())
+            return
+        }
+        val frame = com.beamdrop.receiver.camera.WebcamManager.getLatestFrame()
+        if (frame != null) {
+            writeResponse(output, 200, "OK", "image/jpeg", frame)
+        } else {
+            writeResponse(output, 503, "Service Unavailable", "application/json", "{\"error\":\"No frame available\"}".toByteArray())
+        }
+    }
+
+    private fun handleWebcamControl(input: InputStream, output: OutputStream, headers: Map<String, String>) {
+        if (!pairingManager.isAuthorized(headers["authorization"])) {
+            writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Not paired\"}".toByteArray())
+            return
+        }
+        val cl = headers["content-length"]?.toIntOrNull() ?: 0
+        val body = if (cl > 0) readExactBytes(input, cl) else ByteArray(0)
+        val bodyStr = String(body, Charsets.UTF_8)
+        val json = if (bodyStr.isNotEmpty()) JSONObject(bodyStr) else JSONObject()
+        val action = json.optString("action", "status")
+
+        when (action) {
+            "start" -> com.beamdrop.receiver.camera.WebcamManager.startStreaming(context)
+            "stop" -> com.beamdrop.receiver.camera.WebcamManager.stopStreaming()
+            "toggle_camera" -> com.beamdrop.receiver.camera.WebcamManager.toggleCamera(context)
+            "toggle_torch" -> com.beamdrop.receiver.camera.WebcamManager.toggleTorch(context)
+        }
+
+        val res = JSONObject().apply {
+            put("streaming", com.beamdrop.receiver.camera.WebcamManager.isStreaming.value)
+            put("isBackCamera", com.beamdrop.receiver.camera.WebcamManager.isBackCamera.value)
+            put("isTorchOn", com.beamdrop.receiver.camera.WebcamManager.isTorchOn.value)
+            put("fps", com.beamdrop.receiver.camera.WebcamManager.fps.value)
+        }
+        writeResponse(output, 200, "OK", "application/json", res.toString().toByteArray())
+    }
+
+    private fun handlePhoneDeclineCall(input: InputStream, output: OutputStream, headers: Map<String, String>) {
+        if (!pairingManager.isAuthorized(headers["authorization"])) {
+            writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Not paired\"}".toByteArray())
+            return
+        }
+        val cl = headers["content-length"]?.toIntOrNull() ?: 0
+        val body = if (cl > 0) readExactBytes(input, cl) else ByteArray(0)
+        val bodyStr = String(body, Charsets.UTF_8)
+        val json = if (bodyStr.isNotEmpty()) JSONObject(bodyStr) else JSONObject()
+        val key = json.optString("key").takeIf { it.isNotEmpty() }
+        val message = json.optString("message").takeIf { it.isNotEmpty() }
+        val phoneNumber = json.optString("phoneNumber").takeIf { it.isNotEmpty() }
+
+        if (!message.isNullOrEmpty() && key != null) {
+            com.beamdrop.receiver.service.BeamDropNotificationListenerService.sendQuickReplyOrSms(
+                context, key, phoneNumber, message
+            )
+        }
+        val declined = com.beamdrop.receiver.service.BeamDropNotificationListenerService.declineCall(context, key)
+        val res = JSONObject().apply {
+            put("success", true)
+            put("declined", declined)
+            put("messageSent", !message.isNullOrEmpty())
+        }
+        writeResponse(output, 200, "OK", "application/json", res.toString().toByteArray())
+    }
+
+    private fun handlePhoneMute(output: OutputStream, headers: Map<String, String>) {
+        if (!pairingManager.isAuthorized(headers["authorization"])) {
+            writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Not paired\"}".toByteArray())
+            return
+        }
+        val muted = com.beamdrop.receiver.service.BeamDropNotificationListenerService.muteRinger(context)
+        val res = JSONObject().apply {
+            put("success", muted)
+        }
+        writeResponse(output, 200, "OK", "application/json", res.toString().toByteArray())
     }
 
     private fun writeResponse(output: OutputStream, statusCode: Int, statusText: String, contentType: String, body: ByteArray) {
