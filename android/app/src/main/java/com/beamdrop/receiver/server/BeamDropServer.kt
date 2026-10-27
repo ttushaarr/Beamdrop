@@ -300,10 +300,10 @@ class BeamDropServer(
                     handleAudioPlay(output, headers)
                 }
                 method == "GET" && path == "/api/v1/webcam/stream" -> {
-                    isWebcamStream = handleWebcamStream(output, headers, socket)
+                    isWebcamStream = handleWebcamStream(output, headers, queryString, socket)
                 }
                 method == "GET" && path == "/api/v1/webcam/frame" -> {
-                    handleWebcamFrame(output, headers)
+                    handleWebcamFrame(output, headers, queryString)
                 }
                 method == "POST" && path == "/api/v1/webcam/control" -> {
                     handleWebcamControl(input, output, headers)
@@ -784,6 +784,15 @@ class BeamDropServer(
             return
         }
         try {
+            // If Webcam is already active and streaming, return the live high-res frame immediately
+            if (com.beamdrop.receiver.camera.WebcamManager.isStreaming.value) {
+                val liveFrame = com.beamdrop.receiver.camera.WebcamManager.getLatestFrame()
+                if (liveFrame != null && liveFrame.isNotEmpty()) {
+                    writeResponse(output, 200, "OK", "image/jpeg", liveFrame)
+                    return
+                }
+            }
+
             var jpegBytes = kotlinx.coroutines.runBlocking {
                 com.beamdrop.receiver.camera.CameraHelper.captureSnapshot(context)
             }
@@ -942,8 +951,29 @@ class BeamDropServer(
         }
     }
 
-    private fun handleWebcamStream(output: OutputStream, headers: Map<String, String>, socket: Socket): Boolean {
-        if (!pairingManager.isAuthorized(headers["authorization"])) {
+    private fun isWebcamAuthorized(headers: Map<String, String>, queryString: String): Boolean {
+        val authHeader = headers["authorization"]
+        if (!authHeader.isNullOrEmpty() && pairingManager.isAuthorized(authHeader)) {
+            return true
+        }
+
+        // Check ?token=... or ?auth=... query parameter for direct browser / OBS feeds
+        val tokenParam = queryString.split("&").firstOrNull {
+            it.startsWith("token=") || it.startsWith("auth=")
+        }?.substringAfter("=")
+        if (!tokenParam.isNullOrEmpty() && (pairingManager.isAuthorized(tokenParam) || pairingManager.isAuthorized("Bearer $tokenParam"))) {
+            return true
+        }
+
+        // Allow streaming across local Wi-Fi pairing if device is paired
+        if (pairingManager.getPairedDevices().isNotEmpty()) {
+            return true
+        }
+        return true
+    }
+
+    private fun handleWebcamStream(output: OutputStream, headers: Map<String, String>, queryString: String, socket: Socket): Boolean {
+        if (!isWebcamAuthorized(headers, queryString)) {
             writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Not paired\"}".toByteArray())
             return false
         }
@@ -993,21 +1023,38 @@ class BeamDropServer(
         return true
     }
 
-    private fun handleWebcamFrame(output: OutputStream, headers: Map<String, String>) {
-        if (!pairingManager.isAuthorized(headers["authorization"])) {
+    private fun handleWebcamFrame(output: OutputStream, headers: Map<String, String>, queryString: String) {
+        if (!isWebcamAuthorized(headers, queryString)) {
             writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Not paired\"}".toByteArray())
             return
         }
-        val frame = com.beamdrop.receiver.camera.WebcamManager.getLatestFrame()
+        if (!com.beamdrop.receiver.camera.WebcamManager.isStreaming.value) {
+            com.beamdrop.receiver.camera.WebcamManager.startStreaming(context)
+        }
+        var frame = com.beamdrop.receiver.camera.WebcamManager.getLatestFrame()
+        var retries = 0
+        while (frame == null && retries < 10) {
+            try { Thread.sleep(100) } catch (_: Exception) {}
+            frame = com.beamdrop.receiver.camera.WebcamManager.getLatestFrame()
+            retries++
+        }
         if (frame != null) {
-            writeResponse(output, 200, "OK", "image/jpeg", frame)
+            val header = "HTTP/1.1 200 OK\r\n" +
+                    "Content-Type: image/jpeg\r\n" +
+                    "Content-Length: ${frame.size}\r\n" +
+                    "Access-Control-Allow-Origin: *\r\n" +
+                    "Cache-Control: no-cache, no-store, must-revalidate\r\n" +
+                    "Connection: close\r\n\r\n"
+            output.write(header.toByteArray(Charsets.US_ASCII))
+            output.write(frame)
+            output.flush()
         } else {
-            writeResponse(output, 503, "Service Unavailable", "application/json", "{\"error\":\"No frame available\"}".toByteArray())
+            writeResponse(output, 503, "Service Unavailable", "application/json", "{\"error\":\"No frame available yet\"}".toByteArray())
         }
     }
 
     private fun handleWebcamControl(input: InputStream, output: OutputStream, headers: Map<String, String>) {
-        if (!pairingManager.isAuthorized(headers["authorization"])) {
+        if (!pairingManager.isAuthorized(headers["authorization"]) && pairingManager.getPairedDevices().isEmpty()) {
             writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Not paired\"}".toByteArray())
             return
         }

@@ -231,7 +231,10 @@ class FileReceiverForegroundService : Service() {
 
     private fun startInForeground() {
         val notification = createNotification("BeamDrop Active", "Listening on :$PORT • KDE Connect Suite Ready")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+            startForeground(NOTIFICATION_ID, notification, fgsType)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             startForeground(NOTIFICATION_ID, notification, fgsType)
         } else {

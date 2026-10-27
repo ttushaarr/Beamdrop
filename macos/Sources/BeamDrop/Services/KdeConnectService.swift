@@ -402,7 +402,21 @@ public final class KdeConnectService: ObservableObject {
     public func getWebcamStreamURL() -> URL? {
         let host = getTargetHost()
         let port = getTargetPort()
+        let token = getActiveToken()
+        if !token.isEmpty {
+            return URL(string: "http://\(host):\(port)/api/v1/webcam/stream?token=\(token)")
+        }
         return URL(string: "http://\(host):\(port)/api/v1/webcam/stream")
+    }
+
+    public func getWebcamFrameURL() -> URL? {
+        let host = getTargetHost()
+        let port = getTargetPort()
+        let token = getActiveToken()
+        if !token.isEmpty {
+            return URL(string: "http://\(host):\(port)/api/v1/webcam/frame?token=\(token)")
+        }
+        return URL(string: "http://\(host):\(port)/api/v1/webcam/frame")
     }
 
     public func controlWebcam(action: String) async -> [String: Any]? {

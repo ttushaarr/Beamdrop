@@ -585,8 +585,10 @@ public struct WebcamControlCardView: View {
 
 public struct AdbControlCardView: View {
     @ObservedObject var adb = AdbService.shared
+    @State private var adbPort: String = "5555"
     @State private var pairingPort: String = ""
     @State private var pairingCode: String = ""
+    @State private var connectPort: String = ""
     @State private var showPairingSheet: Bool = false
     
     private var targetHost: String {
@@ -621,10 +623,21 @@ public struct AdbControlCardView: View {
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
             
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
+                HStack(spacing: 4) {
+                    Text("Port:")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                    TextField("5555", text: $adbPort)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 65)
+                        .font(.system(size: 11, design: .monospaced))
+                }
+                
                 Button(action: {
+                    let port = Int(adbPort.trimmingCharacters(in: .whitespaces)) ?? 5555
                     Task {
-                        _ = await adb.connect(host: targetHost, port: 5555)
+                        _ = await adb.connect(host: targetHost, port: port)
                     }
                 }) {
                     HStack {
@@ -633,7 +646,7 @@ public struct AdbControlCardView: View {
                             Text("Connecting...")
                         } else {
                             Image(systemName: "wifi")
-                            Text("1-Click Connect to \(targetHost):5555")
+                            Text("Connect to \(targetHost)")
                         }
                     }
                 }
@@ -679,13 +692,15 @@ public struct AdbControlCardView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Wireless Debugging Pairing")
                     .font(.headline)
-                Text("Enter the 5-digit port and 6-digit code shown in Android Developer Options > Wireless Debugging > 'Pair device with pairing code'")
+                Text("1. In Android Developer Options > Wireless Debugging, switch it ON.\n2. Tap 'Pair device with pairing code' to view the 6-digit code and 5-digit pairing port.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
                 TextField("Pairing Port (e.g. 38472)", text: $pairingPort)
                     .textFieldStyle(.roundedBorder)
                 TextField("6-digit Code (e.g. 123456)", text: $pairingCode)
+                    .textFieldStyle(.roundedBorder)
+                TextField("Connect Port from main screen (e.g. 41235)", text: $connectPort)
                     .textFieldStyle(.roundedBorder)
                 
                 HStack {
@@ -694,11 +709,12 @@ public struct AdbControlCardView: View {
                     Button("Pair & Connect") {
                         if let port = Int(pairingPort.trimmingCharacters(in: .whitespaces)) {
                             let code = pairingCode.trimmingCharacters(in: .whitespaces)
+                            let cPort = Int(connectPort.trimmingCharacters(in: .whitespaces)) ?? 5555
                             showPairingSheet = false
                             Task {
                                 let (ok, _) = await adb.pair(host: targetHost, port: port, code: code)
                                 if ok {
-                                    _ = await adb.connect(host: targetHost, port: 5555)
+                                    _ = await adb.connect(host: targetHost, port: cPort)
                                 }
                             }
                         }

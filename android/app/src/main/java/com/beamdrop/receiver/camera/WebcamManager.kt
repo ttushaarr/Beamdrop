@@ -138,7 +138,7 @@ object WebcamManager {
                                 override fun onConfigured(session: CameraCaptureSession) {
                                     captureSession = session
                                     try {
-                                        val req = camera.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
+                                        val req = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
                                             addTarget(surface)
                                             set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
                                             set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
