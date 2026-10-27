@@ -1,40 +1,36 @@
 import AppKit
+import Carbon
 import Foundation
 import UserNotifications
 
 public final class ScreenshotShortcutManager: ObservableObject {
     public static let shared = ScreenshotShortcutManager()
     
-    private var globalMonitor: Any?
+    private var eventHandlerRef: EventHandlerRef?
+    private var hotKeyRefD: EventHotKeyRef?
+    private var hotKeyRefS: EventHotKeyRef?
     private var localMonitor: Any?
     private var isCapturing = false
     
     private init() {}
     
     public func start() {
-        guard globalMonitor == nil && localMonitor == nil else { return }
-        
-        // Global monitor (captures shortcut when other apps are focused)
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKeyEvent(event)
-        }
-        
-        // Local monitor (captures shortcut when BeamDrop is focused)
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if self?.isShortcutMatch(event) == true {
-                self?.captureAndSendScreenshot()
-                return nil // Consume event
-            }
-            return event
-        }
-        
-        print("ScreenshotShortcutManager: Registered global shortcut ⌘⇧D / ⌘⌥S")
+        registerCarbonHotKeys()
+        registerLocalMonitor()
     }
     
     public func stop() {
-        if let g = globalMonitor {
-            NSEvent.removeMonitor(g)
-            globalMonitor = nil
+        if let refD = hotKeyRefD {
+            UnregisterEventHotKey(refD)
+            hotKeyRefD = nil
+        }
+        if let refS = hotKeyRefS {
+            UnregisterEventHotKey(refS)
+            hotKeyRefS = nil
+        }
+        if let handler = eventHandlerRef {
+            RemoveEventHandler(handler)
+            eventHandlerRef = nil
         }
         if let l = localMonitor {
             NSEvent.removeMonitor(l)
@@ -42,26 +38,57 @@ public final class ScreenshotShortcutManager: ObservableObject {
         }
     }
     
-    private func isShortcutMatch(_ event: NSEvent) -> Bool {
-        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        let chars = event.charactersIgnoringModifiers?.lowercased() ?? ""
+    private func registerCarbonHotKeys() {
+        guard eventHandlerRef == nil else { return }
         
-        // Shortcut 1: Cmd + Shift + D
-        if flags == [.command, .shift] && (chars == "d" || event.keyCode == 2) {
-            return true
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        
+        let handler: EventHandlerUPP = { (_, theEvent, _) -> OSStatus in
+            var hotKeyID = EventHotKeyID()
+            let status = GetEventParameter(
+                theEvent,
+                EventParamName(kEventParamDirectObject),
+                EventParamType(typeEventHotKeyID),
+                nil,
+                MemoryLayout<EventHotKeyID>.size,
+                nil,
+                &hotKeyID
+            )
+            if status == noErr && (hotKeyID.id == 1 || hotKeyID.id == 2) {
+                DispatchQueue.main.async {
+                    ScreenshotShortcutManager.shared.captureAndSendScreenshot()
+                }
+            }
+            return noErr
         }
         
-        // Shortcut 2: Cmd + Option + S (keyCode 1 is 'S' on standard QWERTY)
-        if flags == [.command, .option] && (event.keyCode == 1 || chars == "s" || chars == "ß") {
-            return true
+        let installStatus = InstallEventHandler(GetApplicationEventTarget(), handler, 1, &eventType, nil, &eventHandlerRef)
+        if installStatus != noErr {
+            print("ScreenshotShortcutManager: Failed to install event handler: \(installStatus)")
         }
         
-        return false
+        // Shortcut 1: Cmd + Shift + D (kVK_ANSI_D = 0x02) - works globally across ALL apps without Accessibility perms
+        let hotKeyID1 = EventHotKeyID(signature: OSType(0x42445331), id: 1)
+        let reg1 = RegisterEventHotKey(UInt32(kVK_ANSI_D), UInt32(cmdKey | shiftKey), hotKeyID1, GetApplicationEventTarget(), 0, &hotKeyRefD)
+        
+        // Shortcut 2: Cmd + Option + S (kVK_ANSI_S = 0x01) - secondary alternative
+        let hotKeyID2 = EventHotKeyID(signature: OSType(0x42445332), id: 2)
+        let reg2 = RegisterEventHotKey(UInt32(kVK_ANSI_S), UInt32(cmdKey | optionKey), hotKeyID2, GetApplicationEventTarget(), 0, &hotKeyRefS)
+        
+        print("ScreenshotShortcutManager: Registered system-wide Carbon HotKeys ⌘⇧D (status: \(reg1)) and ⌘⌥S (status: \(reg2))")
     }
     
-    private func handleKeyEvent(_ event: NSEvent) {
-        if isShortcutMatch(event) {
-            captureAndSendScreenshot()
+    private func registerLocalMonitor() {
+        guard localMonitor == nil else { return }
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            let chars = event.charactersIgnoringModifiers?.lowercased() ?? ""
+            if (flags == [.command, .shift] && (chars == "d" || event.keyCode == 2)) ||
+               (flags == [.command, .option] && (chars == "s" || event.keyCode == 1)) {
+                self?.captureAndSendScreenshot()
+                return nil
+            }
+            return event
         }
     }
     
