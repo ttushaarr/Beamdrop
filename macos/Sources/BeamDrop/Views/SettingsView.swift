@@ -41,12 +41,16 @@ public struct SettingsView: View {
             }
         }
         .onAppear {
+            discovery.scanActiveSubnets()
             if let dev = discovery.selectedDevice, !dev.host.isEmpty {
                 self.vm.hostInput = dev.host
                 self.vm.portInput = "\(dev.port)"
+            } else if let first = discovery.discoveredDevices.first {
+                self.vm.hostInput = first.host
+                self.vm.portInput = "\(first.port)"
             } else {
                 let hint = discovery.currentSubnetHint
-                self.vm.hostInput = "\(hint)10"
+                self.vm.hostInput = "\(hint)2"
             }
         }
     }
@@ -73,6 +77,19 @@ public struct SettingsView: View {
                         }
                     }
                     .buttonStyle(.bordered)
+                }
+                
+                if !discovery.discoveredDevices.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Available devices on Wi-Fi (Click to select):")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.secondary)
+                        
+                        ForEach(discovery.discoveredDevices) { dev in
+                            deviceSelectionRow(dev)
+                        }
+                    }
+                    .padding(.bottom, 4)
                 }
                 
                 HStack(spacing: 12) {
@@ -112,7 +129,7 @@ public struct SettingsView: View {
                 Text("2. Enter 6-Digit Pairing PIN")
                     .font(.system(size: 13, weight: .bold))
                 
-                Text("Look at the BeamDrop app screen on your Moto Pad 60 Pro and enter the 6-digit code shown there.")
+                Text("Look at the BeamDrop app screen on your device (\(vm.hostInput.isEmpty ? "target device" : vm.hostInput)) and enter the 6-digit code shown there.")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                 
@@ -128,7 +145,7 @@ public struct SettingsView: View {
                                 .scaleEffect(0.7)
                                 .frame(width: 14, height: 14)
                         } else {
-                            Text("Pair with Tablet")
+                            Text("Pair with Device")
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -150,7 +167,7 @@ public struct SettingsView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
-                        Text("Successfully paired with Moto Pad 60 Pro! One-click transfers are now active.")
+                        Text("Successfully paired with \(vm.hostInput)! One-click transfers are now active.")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.green)
                     }
@@ -280,6 +297,44 @@ public struct SettingsView: View {
             Spacer()
         }
         .padding(10)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(8)
+    }
+    
+    private func deviceSelectionRow(_ dev: PairedDevice) -> some View {
+        let isSelected = vm.hostInput == dev.host
+        return HStack(spacing: 10) {
+            Image(systemName: dev.name.lowercased().contains("phone") ? "iphone" : "ipad")
+                .foregroundColor(dev.isOnline ? .green : .secondary)
+                .font(.system(size: 14))
+            
+            VStack(alignment: .leading, spacing: 1) {
+                Text(dev.name)
+                    .font(.system(size: 11, weight: .bold))
+                Text("\(dev.host):\(dev.port) • \(dev.isPaired ? "Trusted" : "Unpaired")")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            if isSelected {
+                Button("Selected ✓") {
+                    vm.hostInput = dev.host
+                    vm.portInput = "\(dev.port)"
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            } else {
+                Button("Select") {
+                    vm.hostInput = dev.host
+                    vm.portInput = "\(dev.port)"
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+        .padding(8)
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(8)
     }

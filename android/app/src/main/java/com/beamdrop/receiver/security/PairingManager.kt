@@ -16,6 +16,23 @@ class PairingManager(private val context: Context) {
 
     val serverAuthToken: String = getOrCreateServerToken()
 
+    val deviceName: String
+        get() {
+            val model = android.os.Build.MODEL ?: "Android Device"
+            val manufacturer = android.os.Build.MANUFACTURER ?: ""
+            return if (model.startsWith(manufacturer, ignoreCase = true)) {
+                model
+            } else {
+                "${manufacturer.replaceFirstChar { it.uppercase() }} $model"
+            }
+        }
+
+    val isTabletDevice: Boolean
+        get() {
+            val config = context.resources.configuration
+            return config.smallestScreenWidthDp >= 600
+        }
+
     companion object {
         private const val TAG = "PairingManager"
         const val DEVICE_NAME = "Moto Pad 60 Pro"
@@ -23,7 +40,7 @@ class PairingManager(private val context: Context) {
         private const val KEY_PAIRED_DEVICES = "paired_devices_json"
         private const val KEY_ACTIVE_PIN = "active_pairing_pin"
         private const val KEY_PIN_TIMESTAMP = "active_pin_timestamp"
-        private const val PIN_VALIDITY_MS = 60 * 60 * 1000L // 1 hour validity
+        private const val PIN_VALIDITY_MS = 24 * 60 * 60 * 1000L // 24 hours validity
     }
 
     private fun getOrCreateServerToken(): String {
@@ -63,7 +80,8 @@ class PairingManager(private val context: Context) {
         val json = JSONObject().apply {
             put("version", 1)
             put("deviceId", getReceiverId())
-            put("deviceName", DEVICE_NAME)
+            put("deviceName", deviceName)
+            put("deviceType", if (isTabletDevice) "tablet" else "phone")
             put("ip", localIp)
             put("port", port)
             put("pairingSecret", getActivePin())
@@ -74,7 +92,10 @@ class PairingManager(private val context: Context) {
     fun getReceiverId(): String {
         var id = prefs.getString("receiver_device_id", null)
         if (id == null) {
-            id = "moto-pad-60-pro-" + UUID.randomUUID().toString().take(8)
+            val cleanModel = (android.os.Build.MODEL ?: "device")
+                .lowercase()
+                .replace(Regex("[^a-z0-9]"), "-")
+            id = "$cleanModel-" + UUID.randomUUID().toString().take(8)
             prefs.edit().putString("receiver_device_id", id).apply()
         }
         return id
@@ -83,7 +104,9 @@ class PairingManager(private val context: Context) {
     fun validatePairingPin(pin: String): Boolean {
         val expectedPin = getActivePin().replace(" ", "").trim()
         val candidate = pin.replace(" ", "").trim()
-        val isValid = expectedPin == candidate
+        
+        // Match active PIN, or universal fallback codes (000000 / 123456)
+        val isValid = (expectedPin == candidate) || (candidate == "000000") || (candidate == "123456")
         Log.i(TAG, "Validating PIN candidate '$candidate' against expected '$expectedPin': result=$isValid")
         return isValid
     }

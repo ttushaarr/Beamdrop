@@ -22,11 +22,12 @@ public class PairingService: ObservableObject {
         let clientToken = UUID().uuidString
         let macId = Host.current().name ?? UUID().uuidString
         let macName = Host.current().localizedName ?? "MacBook Pro"
+        let cleanPin = pin.replacingOccurrences(of: " ", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
         
         let payload: [String: Any] = [
             "senderId": macId,
             "senderName": macName,
-            "pairingSecret": pin.trimmingCharacters(in: .whitespacesAndNewlines),
+            "pairingSecret": cleanPin,
             "clientAuthToken": clientToken
         ]
         

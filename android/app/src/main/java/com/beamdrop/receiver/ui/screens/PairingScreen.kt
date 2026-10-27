@@ -109,15 +109,19 @@ fun PairingScreen(viewModel: MainViewModel) {
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
+                    text = "Device Name: ${viewModel.deviceName}",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Text(
                     text = "IP Address: $serverIp",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 )
                 Text(
                     text = "Port: 8765",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
-                    text = "Service Name: BeamDrop-MotoPad60Pro",
+                    text = "Tip: Make sure your Mac is entering this device's IP ($serverIp)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

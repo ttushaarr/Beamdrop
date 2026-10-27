@@ -9,7 +9,7 @@ class NsdHelper(private val context: Context) {
 
     private val nsdManager: NsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
     private var registrationListener: NsdManager.RegistrationListener? = null
-    var serviceName: String = "BeamDrop-MotoPad60Pro"
+    var serviceName: String = "BeamDrop-" + (android.os.Build.MODEL ?: "Device").replace(Regex("[^a-zA-Z0-9]"), "")
         private set
 
     companion object {

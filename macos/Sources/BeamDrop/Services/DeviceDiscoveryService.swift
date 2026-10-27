@@ -248,7 +248,7 @@ public class DeviceDiscoveryService: ObservableObject {
         var updatedDevice: PairedDevice?
         let defaultToken = getSavedAuthToken()
         
-        if let idx = discoveredDevices.firstIndex(where: { $0.id == id || $0.name == name }) {
+        if let idx = discoveredDevices.firstIndex(where: { $0.id == id }) {
             discoveredDevices[idx].name = name
             discoveredDevices[idx].host = host
             discoveredDevices[idx].port = port
@@ -260,6 +260,7 @@ public class DeviceDiscoveryService: ObservableObject {
             discoveredDevices[idx].isPaired = true
             updatedDevice = discoveredDevices[idx]
         } else if let idx = discoveredDevices.firstIndex(where: { $0.host == host }) {
+            discoveredDevices[idx].id = id
             discoveredDevices[idx].name = name
             discoveredDevices[idx].host = host
             discoveredDevices[idx].port = port

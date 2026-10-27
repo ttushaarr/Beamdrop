@@ -335,8 +335,8 @@ class BeamDropServer(
             put("status", "ONLINE")
             put("version", 1)
             put("deviceId", pairingManager.getReceiverId())
-            put("deviceName", PairingManager.DEVICE_NAME)
-            put("deviceType", "tablet")
+            put("deviceName", pairingManager.deviceName)
+            put("deviceType", if (pairingManager.isTabletDevice) "tablet" else "phone")
             put("freeSpaceBytes", freeBytes)
             put("isServiceActive", true)
             put("supportsClipboardSync", true)
@@ -573,7 +573,7 @@ class BeamDropServer(
         val resp = JSONObject().apply {
             put("status", "PAIRED")
             put("receiverId", pairingManager.getReceiverId())
-            put("receiverName", PairingManager.DEVICE_NAME)
+            put("receiverName", pairingManager.deviceName)
             put("serverAuthToken", pairingManager.serverAuthToken)
         }
         writeJsonResponse(output, 200, "OK", resp)

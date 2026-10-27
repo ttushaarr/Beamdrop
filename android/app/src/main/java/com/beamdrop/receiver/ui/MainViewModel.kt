@@ -45,6 +45,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _pairedDevices = MutableStateFlow<List<PairedDevice>>(emptyList())
     val pairedDevices = _pairedDevices.asStateFlow()
 
+    val deviceName: String = pairingManager.deviceName
+
     private val _activePin = MutableStateFlow(pairingManager.getActivePin())
     val activePin = _activePin.asStateFlow()
 

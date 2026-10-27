@@ -1,7 +1,7 @@
 import Foundation
 
 public struct PairedDevice: Identifiable, Codable, Equatable {
-    public let id: String
+    public var id: String
     public var name: String
     public var host: String
     public var port: Int
