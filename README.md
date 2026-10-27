@@ -4,7 +4,11 @@
 > Seamless two-way zero-click file transfers, Android Share Sheet integration, Mac menu bar quick drop, continuity camera snapshots, camera roll backup, inline notification quick replies, live clipboard synchronization, remote trackpad gestures, media remote, presentation clicker, and system automations between MacBook and Android.  
 > **100% Open Source • 100% Local Wi-Fi • Zero Cloud Servers • Zero Telemetry.**
 
-🌐 **Live Website & Docs**: [`website/index.html`](website/index.html) or deploy with GitHub Pages via `/docs`.  
+🌐 **Live Website**: [https://ttushaarr.github.io/Beamdrop/](https://ttushaarr.github.io/Beamdrop/)  
+📦 **Direct Downloads**:
+- 🍏 **macOS (Apple Silicon)**: [Download BeamDrop-Mac.zip](https://github.com/ttushaarr/Beamdrop/raw/main/dist/BeamDrop-Mac.zip) (~530 KB)
+- 🤖 **Android (Phones & Tablets)**: [Download BeamDrop-Receiver.apk](https://github.com/ttushaarr/Beamdrop/raw/main/dist/BeamDrop-Receiver.apk) (~16 MB)
+- 📁 **All Releases & Binaries**: [Browse `dist/` Directory](https://github.com/ttushaarr/Beamdrop/tree/main/dist)
 📜 **License**: [MIT License](LICENSE).
 
 ---

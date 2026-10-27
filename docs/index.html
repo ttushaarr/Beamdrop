@@ -103,7 +103,7 @@
 
             <!-- Action Buttons -->
             <div class="flex items-center gap-3">
-                <a href="https://github.com/your-username/beamdrop" target="_blank" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 border border-gray-700/60 transition-all">
+                <a href="https://github.com/ttushaarr/Beamdrop" target="_blank" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 border border-gray-700/60 transition-all">
                     <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
                         <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
                     </svg>
@@ -160,8 +160,8 @@
             <!-- Terminal Clone Command -->
             <div class="inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-gray-900/90 border border-gray-800 text-xs font-mono text-gray-400">
                 <span class="text-green-400">$</span>
-                <span>git clone https://github.com/your-username/beamdrop.git</span>
-                <button onclick="navigator.clipboard.writeText('git clone https://github.com/your-username/beamdrop.git'); this.innerText='Copied!';" class="ml-2 text-gray-400 hover:text-white px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 transition">Copy</button>
+                <span>git clone https://github.com/ttushaarr/Beamdrop.git</span>
+                <button onclick="navigator.clipboard.writeText('git clone https://github.com/ttushaarr/Beamdrop.git'); this.innerText='Copied!';" class="ml-2 text-gray-400 hover:text-white px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 transition">Copy</button>
             </div>
         </div>
 
@@ -179,6 +179,7 @@
                 <!-- Interactive Tabs -->
                 <div class="flex items-center gap-1 bg-gray-900/80 p-1 rounded-lg border border-gray-800 overflow-x-auto" id="showcase-tabs">
                     <button onclick="switchTab('transfer')" class="tab-btn px-3 py-1 rounded text-xs font-semibold bg-brand-600 text-white" data-tab="transfer">⚡ File Drop</button>
+                    <button onclick="switchTab('ai')" class="tab-btn px-3 py-1 rounded text-xs font-semibold text-gray-400 hover:text-white" data-tab="ai">🤖 AI Question Solver</button>
                     <button onclick="switchTab('clipboard')" class="tab-btn px-3 py-1 rounded text-xs font-semibold text-gray-400 hover:text-white" data-tab="clipboard">📋 Clipboard</button>
                     <button onclick="switchTab('trackpad')" class="tab-btn px-3 py-1 rounded text-xs font-semibold text-gray-400 hover:text-white" data-tab="trackpad">🖱️ Trackpad</button>
                     <button onclick="switchTab('media')" class="tab-btn px-3 py-1 rounded text-xs font-semibold text-gray-400 hover:text-white" data-tab="media">🎵 Media</button>
@@ -224,6 +225,53 @@
                     </div>
                 </div>
 
+                <!-- Tab: AI Question Solver -->
+                <div id="tab-ai" class="hidden w-full flex flex-col md:flex-row items-center gap-8 justify-between p-4">
+                    <div class="flex-1 space-y-4">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 text-xs font-semibold">
+                            🤖 Background Vision AI Solver (⌘⇧X)
+                        </div>
+                        <h3 class="text-2xl font-bold">Press ⌘⇧X on Mac. See it solved on your Tablet.</h3>
+                        <p class="text-gray-400 text-sm leading-relaxed">
+                            Take a screenshot of any coding challenge, math problem, or quiz question anywhere on your Mac. ScreenCaptureKit beams it straight to your tablet over Wi-Fi, where Google Gemini AI solves it instantly in simple human language—with syntax-highlighted code and 1-tap "Send to Mac Clipboard (⌘V)".
+                        </p>
+                        <div class="flex items-center gap-6 pt-2 font-mono text-xs text-gray-400">
+                            <div><span class="text-white font-bold">~1.5s</span> Gemini 3.5 Flash</div>
+                            <div><span class="text-white font-bold">⌘⇧X / ⌥⌘A</span> Global Hotkeys</div>
+                        </div>
+                    </div>
+                    <div class="w-full md:w-96 p-5 rounded-xl bg-gray-900/90 border border-gray-800 shadow-xl space-y-3 font-sans">
+                        <div class="flex items-center justify-between text-xs pb-2 border-b border-gray-800">
+                            <span class="flex items-center gap-1.5 text-violet-400 font-semibold">
+                                <span class="w-2 h-2 rounded-full bg-violet-400 animate-pulse"></span>
+                                Solved by Gemini
+                            </span>
+                            <span class="text-[11px] text-gray-400 font-mono">1.2s • O(n)</span>
+                        </div>
+                        <div class="space-y-2 text-xs">
+                            <div class="p-2.5 rounded-lg bg-gray-800/70 border border-gray-700/50">
+                                <div class="text-[11px] font-bold text-violet-300">🎯 The Question</div>
+                                <div class="text-[11px] text-gray-300 mt-0.5">Find min operations to make all elements divisible by 3.</div>
+                            </div>
+                            <div class="p-2.5 rounded-lg bg-gray-800/70 border border-gray-700/50">
+                                <div class="text-[11px] font-bold text-amber-300">💡 Simple Explanation</div>
+                                <div class="text-[11px] text-gray-300 mt-0.5">• Any number not divisible by 3 takes exactly 1 operation. Simply count them!</div>
+                            </div>
+                            <div class="p-2.5 rounded-lg bg-[#1E1E2E] border border-gray-700/80 font-mono text-[11px]">
+                                <div class="flex justify-between text-gray-400 text-[10px] pb-1 border-b border-gray-800">
+                                    <span class="text-blue-400 font-bold">PYTHON</span>
+                                    <span class="text-emerald-400 cursor-pointer">Copy Code</span>
+                                </div>
+                                <div class="text-gray-200 mt-1">return sum(1 for x in nums if x % 3 != 0)</div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 pt-1">
+                            <button class="flex-1 py-1.5 rounded-lg bg-violet-600 text-white text-[11px] font-bold">Send to Mac (⌘V)</button>
+                            <button class="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 text-[11px]">Next</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Tab: Clipboard -->
                 <div id="tab-clipboard" class="hidden w-full flex flex-col md:flex-row items-center gap-8 justify-between p-4">
                     <div class="flex-1 space-y-4">
@@ -238,7 +286,7 @@
                     <div class="w-full md:w-80 p-5 rounded-xl bg-gray-900/90 border border-gray-800 shadow-xl space-y-3">
                         <div class="text-xs font-semibold text-gray-400">Recent Pasteboard Sync</div>
                         <div class="p-3 rounded-lg bg-gray-800/60 border border-gray-700/60 font-mono text-xs text-blue-300">
-                            "https://github.com/your-username/beamdrop"
+                            "https://github.com/ttushaarr/Beamdrop"
                         </div>
                         <div class="flex items-center justify-between text-[11px] text-gray-400">
                             <span>Synced: Mac → Moto Pad</span>
@@ -358,6 +406,28 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 
+                <!-- Card 0: AI Solver -->
+                <div class="glass-panel p-6 rounded-2xl border border-violet-500/30 hover:border-violet-500/60 transition bg-violet-950/10">
+                    <div class="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 mb-4">
+                        🤖
+                    </div>
+                    <h3 class="text-lg font-bold mb-2">Gemini AI Question Solver</h3>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        Press <code class="text-violet-300 font-mono">⌘⇧X</code> anywhere on Mac to capture any question or coding problem. Beams to tablet & solves with Gemini AI in readable English with dark syntax code & 1-tap Mac pasteboard copy.
+                    </p>
+                </div>
+
+                <!-- Card 0.5: Screenshot Beam -->
+                <div class="glass-panel p-6 rounded-2xl border border-blue-500/30 hover:border-blue-500/60 transition">
+                    <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-4">
+                        📸
+                    </div>
+                    <h3 class="text-lg font-bold mb-2">Global Screenshot Beam</h3>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        Hit <code class="text-blue-300 font-mono">⌘⇧D</code> from any app on macOS. High-performance ScreenCaptureKit grabs retina screenshots and beams them directly into Android <code class="text-gray-300">Pictures/LaptopTransfer/</code>.
+                    </p>
+                </div>
+
                 <!-- Card 1 -->
                 <div class="glass-panel p-6 rounded-2xl border border-gray-800 hover:border-gray-700 transition">
                     <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-4">
@@ -506,6 +576,11 @@
                                 <td class="p-3 text-green-400">Bearer Token</td>
                             </tr>
                             <tr>
+                                <td class="p-3 text-violet-400 font-semibold">POST /api/v1/ai/solve</td>
+                                <td class="p-3">Multimodal vision question solver with Gemini AI (⌘⇧X)</td>
+                                <td class="p-3 text-green-400">Bearer Token</td>
+                            </tr>
+                            <tr>
                                 <td class="p-3 text-blue-400 font-semibold">POST /api/v1/ring</td>
                                 <td class="p-3">Trigger maximum volume locator alarm</td>
                                 <td class="p-3 text-green-400">Bearer Token</td>
@@ -524,7 +599,7 @@
                 Get BeamDrop for free.
             </h2>
             <p class="text-gray-400 text-sm sm:text-base mb-12">
-                Download the pre-compiled binary packages or build from source code.
+                Download ready-to-run pre-compiled packages directly from GitHub. Zero account required.
             </p>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
@@ -538,15 +613,21 @@
                         </div>
                         <h3 class="text-xl font-bold mb-2">BeamDrop for macOS</h3>
                         <p class="text-gray-400 text-xs leading-relaxed mb-6">
-                            Native Apple Silicon build. Runs silently in the menu bar or dock with zero idle battery impact.
+                            Native Apple Silicon build. Runs silently in your menu bar with instant global hotkeys (<code class="text-blue-300">⌘⇧X</code> AI question solver, <code class="text-blue-300">⌘⇧D</code> screenshot beam, drag-to-drop menu bar target).
                         </p>
                     </div>
 
                     <div class="space-y-3">
-                        <a href="https://github.com/your-username/beamdrop/releases/latest/download/BeamDrop.zip" class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-white text-gray-950 hover:bg-gray-100 transition shadow-lg">
-                            <span>Download BeamDrop.app</span>
-                            <span class="text-[10px] text-gray-500 font-mono font-normal">(.zip • ~1.6 MB)</span>
+                        <a href="https://github.com/ttushaarr/Beamdrop/raw/main/dist/BeamDrop-Mac.zip" class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-white text-gray-950 hover:bg-gray-100 transition shadow-lg">
+                            <span>Download BeamDrop for Mac</span>
+                            <span class="text-[10px] text-gray-500 font-mono font-normal">(.zip • ~530 KB)</span>
                         </a>
+                        <div class="flex items-center gap-2 text-[11px] text-gray-400">
+                            <span>Direct GitHub Mirror:</span>
+                            <a href="https://github.com/ttushaarr/Beamdrop/raw/main/dist/BeamDrop.zip" class="text-blue-400 hover:underline">BeamDrop.zip</a>
+                            <span>•</span>
+                            <a href="https://github.com/ttushaarr/Beamdrop/tree/main/dist" class="text-gray-400 hover:text-white hover:underline">View in Repo</a>
+                        </div>
                         <div class="p-2.5 rounded-lg bg-gray-900 border border-gray-800 text-[11px] font-mono text-gray-400 flex items-center justify-between">
                             <span>open /Applications/BeamDrop.app</span>
                             <button onclick="navigator.clipboard.writeText('open /Applications/BeamDrop.app')" class="text-gray-400 hover:text-white">Copy</button>
@@ -563,15 +644,21 @@
                         </div>
                         <h3 class="text-xl font-bold mb-2">BeamDrop for Android</h3>
                         <p class="text-gray-400 text-xs leading-relaxed mb-6">
-                            Receiver service with background foreground notification, live trackpad, presentation clicker & MediaStore integration.
+                            Receiver service with background foreground notification, Gemini AI Vision Question Solver, live trackpad, presentation clicker & MediaStore auto-routing.
                         </p>
                     </div>
 
                     <div class="space-y-3">
-                        <a href="https://github.com/your-username/beamdrop/releases/latest/download/BeamDrop-Receiver.apk" class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-500 text-white transition shadow-lg shadow-blue-600/20">
+                        <a href="https://github.com/ttushaarr/Beamdrop/raw/main/dist/BeamDrop-Receiver.apk" class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-500 text-white transition shadow-lg shadow-blue-600/20">
                             <span>Download BeamDrop APK</span>
-                            <span class="text-[10px] text-blue-200 font-mono font-normal">(.apk • ~15 MB)</span>
+                            <span class="text-[10px] text-blue-200 font-mono font-normal">(.apk • ~16 MB)</span>
                         </a>
+                        <div class="flex items-center gap-2 text-[11px] text-gray-400">
+                            <span>Direct GitHub Mirror:</span>
+                            <a href="https://raw.githubusercontent.com/ttushaarr/Beamdrop/main/dist/BeamDrop-Receiver.apk" class="text-green-400 hover:underline">Raw APK</a>
+                            <span>•</span>
+                            <a href="https://github.com/ttushaarr/Beamdrop/tree/main/dist" class="text-gray-400 hover:text-white hover:underline">View in Repo</a>
+                        </div>
                         <div class="p-2.5 rounded-lg bg-gray-900 border border-gray-800 text-[11px] font-mono text-gray-400 flex items-center justify-between">
                             <span>adb install -r BeamDrop-Receiver.apk</span>
                             <button onclick="navigator.clipboard.writeText('adb install -r BeamDrop-Receiver.apk')" class="text-gray-400 hover:text-white">Copy</button>
@@ -597,7 +684,17 @@
                         <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
                     </summary>
                     <p class="text-xs text-gray-400 mt-3 leading-relaxed">
-                        No. BeamDrop works 100% offline. Both devices simply need to be connected to the same Wi-Fi network, personal mobile hotspot, or local router. Not a single byte ever leaves your local network.
+                        No. Core BeamDrop file sharing, clipboard sync, trackpad, and commands work 100% offline. Both devices simply connect to the same Wi-Fi network, personal mobile hotspot, or local router. (Gemini AI Question Solver requires internet on the tablet only to query the Google Gemini Vision API).
+                    </p>
+                </details>
+
+                <details class="glass-panel p-5 rounded-xl border border-gray-800 group">
+                    <summary class="font-bold text-sm text-gray-200 cursor-pointer list-none flex items-center justify-between">
+                        <span>How does the AI Question Solver shortcut work?</span>
+                        <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <p class="text-xs text-gray-400 mt-3 leading-relaxed">
+                        Pressing <code>⌘⇧X</code> or <code>⌥⌘A</code> on your Mac automatically captures a high-resolution screenshot using ScreenCaptureKit and sends it across Wi-Fi to your tablet. Your tablet solves it in the background using Google Gemini AI, displaying the step-by-step logic and code with a 1-tap button to sync the code back to your Mac clipboard (⌘V).
                     </p>
                 </details>
 
@@ -643,10 +740,10 @@
                 <span>Released under the MIT License</span>
             </div>
             <div class="flex items-center gap-6">
-                <a href="https://github.com/your-username/beamdrop" class="hover:text-gray-300 transition">GitHub</a>
+                <a href="https://github.com/ttushaarr/Beamdrop" class="hover:text-gray-300 transition">GitHub</a>
                 <a href="#features" class="hover:text-gray-300 transition">Features</a>
                 <a href="#download" class="hover:text-gray-300 transition">Download</a>
-                <a href="https://github.com/your-username/beamdrop/blob/main/LICENSE" class="hover:text-gray-300 transition">License</a>
+                <a href="https://github.com/ttushaarr/Beamdrop/blob/main/LICENSE" class="hover:text-gray-300 transition">License</a>
             </div>
         </div>
     </footer>
@@ -666,7 +763,7 @@
             });
 
             // Update Tab Content Panes
-            const tabs = ['transfer', 'clipboard', 'trackpad', 'media', 'commands', 'battery'];
+            const tabs = ['transfer', 'ai', 'clipboard', 'trackpad', 'media', 'commands', 'battery'];
             tabs.forEach(t => {
                 const el = document.getElementById('tab-' + t);
                 if (el) {
@@ -679,5 +776,7 @@
             });
         }
     </script>
+</body>
+</html>
 </body>
 </html>
