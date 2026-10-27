@@ -44,25 +44,43 @@ public struct SettingsView: View {
             if let dev = discovery.selectedDevice, !dev.host.isEmpty {
                 self.vm.hostInput = dev.host
                 self.vm.portInput = "\(dev.port)"
-            } else if self.vm.hostInput.isEmpty {
-                self.vm.hostInput = "192.168.1.7"
+            } else {
+                let hint = discovery.currentSubnetHint
+                self.vm.hostInput = "\(hint)10"
             }
         }
     }
     
     private var pairingTab: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Step 1: Discovered / Target Tablet
+            // Step 1: Discovered / Target Device
             VStack(alignment: .leading, spacing: 8) {
-                Text("1. Target Android Tablet")
-                    .font(.system(size: 13, weight: .bold))
+                HStack {
+                    Text("1. Target Android Device")
+                        .font(.system(size: 13, weight: .bold))
+                    Spacer()
+                    Button(action: { discovery.scanActiveSubnets() }) {
+                        HStack(spacing: 4) {
+                            if discovery.isSearching {
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                                    .frame(width: 12, height: 12)
+                            } else {
+                                Image(systemName: "sparkle.magnifyingglass")
+                            }
+                            Text("Auto-Scan Active Subnet")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
                 
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("IP Address:")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.secondary)
-                        TextField("e.g. 192.168.1.45", text: $vm.hostInput)
+                        TextField("e.g. \(discovery.currentSubnetHint)45", text: $vm.hostInput)
                             .textFieldStyle(.roundedBorder)
                     }
                     
@@ -82,7 +100,7 @@ public struct SettingsView: View {
                             let port = Int(vm.portInput) ?? 8765
                             discovery.addManualDevice(host: vm.hostInput, port: port)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.borderedProminent)
                     }
                 }
             }

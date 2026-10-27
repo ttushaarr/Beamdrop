@@ -18,8 +18,10 @@ public final class BatteryService: ObservableObject {
         timerTask = Task { [weak self] in
             while !Task.isCancelled {
                 self?.refreshMacBattery()
+                let host = DeviceDiscoveryService.shared.selectedDevice?.host ?? targetHost
+                let currentPort = DeviceDiscoveryService.shared.selectedDevice?.port ?? port
                 if let battery = self?.macBattery {
-                    await self?.pushMacBatteryToTablet(battery, host: targetHost, port: port, token: token)
+                    await self?.pushMacBatteryToTablet(battery, host: host, port: currentPort, token: token)
                 }
                 try? await Task.sleep(nanoseconds: 30 * 1_000_000_000) // Every 30 seconds
             }

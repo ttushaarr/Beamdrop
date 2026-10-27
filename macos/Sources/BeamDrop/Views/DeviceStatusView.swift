@@ -48,6 +48,20 @@ public struct DeviceStatusView: View {
             
             Spacer()
             
+            Button(action: { discovery.scanActiveSubnets() }) {
+                if discovery.isSearching {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+            .help("Re-scan active Wi-Fi subnet for devices")
+            
             if let dev = discovery.selectedDevice, dev.isOnline {
                 Image(systemName: "wifi")
                     .foregroundColor(.green)

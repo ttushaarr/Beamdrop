@@ -59,9 +59,11 @@ public class ClipboardSyncService: ObservableObject {
     }
     
     public func sendClipboardToTablet(text: String) {
+        let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? .standard
+        let targetIp = prefs.string(forKey: "target_ip") ?? "192.168.1.7"
         let dev = DeviceDiscoveryService.shared.selectedDevice ?? DeviceDiscoveryService.shared.discoveredDevices.first(where: { $0.isPaired })
-        let host = (dev?.host.isEmpty == false) ? dev!.host : "192.168.1.7"
-        let port = (dev?.port ?? 0) > 0 ? dev!.port : 8765
+        let host = (dev?.host.isEmpty == false) ? dev!.host : targetIp
+        let port = (dev?.port ?? 0) > 0 ? dev!.port : (prefs.integer(forKey: "target_port") > 0 ? prefs.integer(forKey: "target_port") : 8765)
         let token = (dev?.serverAuthToken.isEmpty == false) ? dev!.serverAuthToken : "e71cae5964a44470a759c097719e8cbeb124845567d0462ba93aaf096581e13f"
         
         guard let url = URL(string: "http://\(host):\(port)/api/v1/clipboard") else { return }
@@ -103,9 +105,11 @@ public class ClipboardSyncService: ObservableObject {
         
         sseTask = Task { [weak self] in
             while !Task.isCancelled {
+                let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? .standard
+                let targetIp = prefs.string(forKey: "target_ip") ?? "192.168.1.7"
                 let dev = DeviceDiscoveryService.shared.selectedDevice ?? DeviceDiscoveryService.shared.discoveredDevices.first(where: { $0.isPaired })
-                let host = (dev?.host.isEmpty == false) ? dev!.host : "192.168.1.7"
-                let port = (dev?.port ?? 0) > 0 ? dev!.port : 8765
+                let host = (dev?.host.isEmpty == false) ? dev!.host : targetIp
+                let port = (dev?.port ?? 0) > 0 ? dev!.port : (prefs.integer(forKey: "target_port") > 0 ? prefs.integer(forKey: "target_port") : 8765)
                 let token = (dev?.serverAuthToken.isEmpty == false) ? dev!.serverAuthToken : "e71cae5964a44470a759c097719e8cbeb124845567d0462ba93aaf096581e13f"
                 
                 guard let url = URL(string: "http://\(host):\(port)/api/v1/clipboard/events") else {
