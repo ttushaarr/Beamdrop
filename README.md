@@ -1,7 +1,7 @@
 # BeamDrop: AirDrop & KDE Connect for macOS and Android
 
 > **Fast, secure, local Wi-Fi file sharing & bidirectional device integration.**  
-> Seamless zero-click file transfers, live clipboard synchronization, remote trackpad gestures, media remote, presentation clicker, and system automations between MacBook and Android.  
+> Seamless two-way zero-click file transfers, Android Share Sheet integration, Mac menu bar quick drop, continuity camera snapshots, camera roll backup, inline notification quick replies, live clipboard synchronization, remote trackpad gestures, media remote, presentation clicker, and system automations between MacBook and Android.  
 > **100% Open Source • 100% Local Wi-Fi • Zero Cloud Servers • Zero Telemetry.**
 
 🌐 **Live Website & Docs**: [`website/index.html`](website/index.html) or deploy with GitHub Pages via `/docs`.  
@@ -13,7 +13,12 @@
 
 | Feature | Description | macOS | Android |
 | :--- | :--- | :---: | :---: |
-| ⚡ **Zero-Click File Drops** | Photos, videos, and docs auto-route into `Pictures/`, `Movies/`, and `Download/` with instant gallery indexing. | ✅ Sender | ✅ Receiver |
+| ⚡ **Zero-Click File Drops** | Photos, videos, and docs sent from Mac auto-route into Android `Pictures/`, `Movies/`, and `Download/` with instant gallery indexing. | ✅ Sender | ✅ Receiver |
+| 📤 **Android ➔ Mac Sharing** | Send files from Android to Mac's `~/Downloads/BeamDrop/` via the in-app picker or native Android Share Sheet (`ACTION_SEND`). | ✅ Receiver | ✅ Sender |
+| 🪟 **Menu Bar Quick Drop** | Drag files directly onto the macOS menu bar icon to send instantly without opening the main application window. | ✅ Sender | — |
+| 📸 **Continuity Camera** | Use your Android camera as a Mac continuity webcam with 1-click high-res snapshot capture to `~/Desktop/`. | ✅ Viewer | ✅ Capture |
+| 🖼️ **Camera Roll Backup** | One-tap backup of recent Android camera roll photos straight to Mac `~/Pictures/BeamDrop/Camera/`. | ✅ Receiver | ✅ Sender |
+| 💬 **Notification Quick Reply** | View Android notifications on macOS and reply directly to WhatsApp, SMS, and messaging apps using inline textfields. | ✅ Sender | ✅ Streamer |
 | 📋 **Live Clipboard Sync** | Copy on Mac, paste on Android. Copy on Android, paste on Mac. Sub-10ms latency over local SSE. | ✅ Bi-dir | ✅ Bi-dir |
 | 🖱️ **Remote Trackpad & Keys** | Use your Android device as a wireless Mac trackpad (drag, tap-to-click, right-click, scroll strip, typing). | ✅ Server | ✅ Client |
 | 🎵 **Media Remote (MPRIS)** | Control Spotify, Apple Music, and Mac system audio volume remotely from your device. | ✅ Server | ✅ Client |
@@ -21,44 +26,69 @@
 | ⚙️ **One-Tap System Commands** | Lock screen, sleep, take desktop screenshot, mute, empty trash, launch Terminal, and open URLs. | ✅ Server | ✅ Client |
 | 🔔 **Find My Device Ringing** | Ring Android device with max volume alarm + vibration from Mac, or ring Mac loudly from Android. | ✅ Bi-dir | ✅ Bi-dir |
 | 🔋 **Bidirectional Battery** | Real-time battery percentage and charging indicator (⚡) visible on both devices. | ✅ Bi-dir | ✅ Bi-dir |
-| 📲 **Notification Mirroring** | Mirror incoming Android notifications to macOS Notification Center. | ✅ Display | ✅ Streamer |
+| 🌐 **Dynamic Wi-Fi Discovery** | Works across home Wi-Fi, office/campus subnets (`10.x`, `192.168.x`), and mobile hotspots without manual IP entry. | ✅ Bi-dir | ✅ Bi-dir |
 
 ---
 
-### The Transfer Pipeline
+## 2. Two-Way Transfer Pipeline
 
 ```
-[MacBook (macOS)] ──(Local Wi-Fi / Direct TCP)──> [Android Device (Phone / Tablet)]
-        │                                                     │
-   Drag & Drop                                       Background Service
-   or File Picker                                             │
-        │                                            Scoped Storage Router
-   SHA-256 Stream                                             │
-                                           ┌──────────────────┼──────────────────┐
-                                           ▼                  ▼                  ▼
-                                       Pictures/           Movies/           Download/
-                                    LaptopTransfer/    LaptopTransfer/    LaptopTransfer/
-                                           │                  │                  │
-                                     Google Photos/        Gallery         Files / Docs
-                                        Gallery          Auto-Indexed
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           Two-Way Transfer Architecture                         │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+   [MacBook (macOS)] ────────(Local Wi-Fi / TCP :8765)───────> [Android Device]
+   • Drag & drop onto app window                             • Auto-routes:
+   • Menu bar quick drop target                                - Pictures/LaptopTransfer/ (Gallery)
+   • SHA-256 bit-for-bit verification                         - Movies/LaptopTransfer/ (Videos)
+                                                               - Download/LaptopTransfer/ (Docs)
+
+   [MacBook (macOS)] <───────(Local Wi-Fi / TCP :8768)──────── [Android Device]
+   • Mac Receiver Service (:8768)                            • Native Android Share Sheet (ACTION_SEND)
+   • Saves to ~/Downloads/BeamDrop/                          • In-App Multi-File Picker
+   • Camera photos to ~/Pictures/BeamDrop/Camera/            • 1-Tap Camera Roll Auto-Backup
+   • Live camera snapshot to ~/Desktop/                      • Continuity Camera Endpoint (:8765)
 ```
 
 ### The Workflow:
 1. **Initial Pairing (One-Time Only)**:
    - Launch BeamDrop on both devices.
    - Enter the 6-digit PIN code displayed on the Android device into the Mac app (or scan the QR payload).
-   - Trust credentials and cryptographic auth tokens are established and persisted.
-2. **Transferring Files**:
-   - On Mac: Drag and drop any file or click **Select File**.
-   - With **"Send automatically on select"** checked, transfer starts immediately! (Or click **Send Now**).
-   - Transfer streams directly over local Wi-Fi with real-time speed (MB/s), ETA countdown, and progress bar.
-   - **On the Android device: Zero manual steps required.** The device saves the file automatically into the appropriate storage folder with MediaStore registration.
+   - Cryptographic auth tokens are established and stored securely.
+2. **Sending from Mac to Android**:
+   - Drag and drop any file onto the BeamDrop window or the **Menu Bar icon**.
+   - With **"Send automatically on select"** checked, transfer starts immediately.
+   - Files are automatically classified and indexed into `Pictures/`, `Movies/`, or `Download/`.
+3. **Sending from Android to Mac**:
+   - **From Any App (Share Sheet)**: Select photos/documents in Google Photos, Files, or Gallery → tap **Share** → select **BeamDrop**.
+   - **From BeamDrop App**: Tap **"Send Files"** to pick documents/photos, or tap **"Backup Photos"** to sync your camera roll.
+   - Files arrive instantly in `~/Downloads/BeamDrop/` or `~/Pictures/BeamDrop/Camera/` on your Mac with native notifications and chime.
 
 ---
 
-## 2. Automatic Android Storage Routing (MediaStore Integration)
+## 3. Continuity Camera & Remote Features
 
-All incoming files are routed dynamically based on MIME type and extension using modern Scoped Storage APIs:
+### 3.1 Continuity Camera (Android ➔ Mac)
+- Click **"Take Photo from Android"** in the Mac app under the Continuity Camera card.
+- Android's Camera2 engine captures a full 1280x720 JPEG snapshot.
+- The photo transfers instantly to `~/Desktop/BeamDrop_Snapshot_<timestamp>.jpg` with a Finder reveal button and notification chime.
+- If BeamDrop was backgrounded, it automatically wakes up to capture and stream the frame.
+
+### 3.2 macOS Menu Bar Quick Drop
+- BeamDrop runs an `NSStatusItem` in your macOS top menu bar with a paperplane icon.
+- **Direct Drop Target**: Drag any file from Finder onto the menu bar icon to drop it to your Android device immediately—no need to switch windows.
+- **Status Popover**: Click the icon to view connection status, battery levels, initiate quick file transfers, or re-scan your network subnet.
+
+### 3.3 Notification Quick Reply
+- Incoming Android notifications (WhatsApp, SMS, Telegram, Signal, Slack) are mirrored to your Mac.
+- Notifications supporting Android's `RemoteInput` display an inline reply text field.
+- Type your response on Mac and hit **Reply**—BeamDrop dispatches the reply directly through Android without needing to unlock your device.
+
+---
+
+## 4. Automatic Storage Routing (MediaStore Integration)
+
+Incoming files on Android are routed dynamically based on MIME type and extension using Scoped Storage APIs:
 
 | File Type | Extensions | Device Storage Path | Gallery Integration |
 |---|---|---|---|
@@ -67,48 +97,55 @@ All incoming files are routed dynamically based on MIME type and extension using
 | **Documents & Archives** | `.pdf`, `.zip`, `.tar`, `.gz`, `.7z`, `.docx`, `.xlsx`, code, text | `Download/LaptopTransfer/` | Standard `Download/` folder via `MediaStore.Downloads` |
 
 ### Duplicate File Protection
-BeamDrop **never silently overwrites** existing files. If `photo.jpg` already exists in `Pictures/LaptopTransfer/`, the incoming file is automatically saved as `photo (1).jpg`, `photo (2).jpg`, etc., preserving the original file extension and integrity.
+BeamDrop **never silently overwrites** existing files on either macOS or Android. If `report.pdf` already exists, incoming files are automatically renamed to `report (1).pdf`, `report (2).pdf`, preserving the original extension and data.
 
 ---
 
-## 3. Security & Privacy Architecture
+## 5. Security & Privacy Architecture
 
-- **Local Network Only**: Transfers occur over direct TCP sockets on your local Wi-Fi network. No telemetry, analytics, third-party relays, or cloud servers.
-- **Mutual Device Trust**: Unpaired devices receive `HTTP 401 Unauthorized` and are instantly rejected.
-- **Cryptographic PIN Authentication**: One-time 6-digit pairing PIN generates a persistent SHA-256 Bearer Token exchanged over HTTP and verified on every transfer chunk.
-- **SHA-256 Bit-for-Bit Integrity**: Mac calculates the SHA-256 hash before sending; Android verifies the checksum during transfer to ensure 100% uncorrupted delivery.
+- **Local Network Only**: Transfers occur over direct TCP sockets on your local Wi-Fi network. Zero cloud relays, zero external telemetry, zero tracking.
+- **Mutual Device Trust**: Unpaired clients receive `HTTP 401 Unauthorized` and are rejected.
+- **Cryptographic PIN Authentication**: One-time 6-digit pairing PIN generates a persistent SHA-256 Bearer Token verified on every API request and transfer chunk.
+- **SHA-256 Bit-for-Bit Integrity**: Mac calculates SHA-256 hash before sending; Android verifies checksum during stream to guarantee 100% uncorrupted delivery.
+- **Network Ports**:
+  - `8765`: Android Receiver Server (file upload, SSE events stream, remote commands, continuity camera).
+  - `8768`: macOS Reverse Receiver Server (receiving files from Android, camera backups, ping discovery).
 
 ---
 
-## 4. Architecture & Directory Structure
+## 6. Architecture & Directory Structure
 
 ```
 beamdrop/
-├── macos/                     # Native macOS Sender (Swift 5.9, SwiftUI)
+├── macos/                     # Native macOS Application (Swift 5.9, SwiftUI)
 │   ├── Sources/BeamDrop/
 │   │   ├── App/               # Entrypoint & AppDelegate
 │   │   ├── Models/            # TransferItem, PairedDevice, KdeModels
-│   │   ├── Services/          # TransferClient, ClipboardSync, Discovery, KDE Connect
-│   │   └── Views/             # SwiftUI DropZone, KDE Connect, Progress, History
+│   │   ├── Services/          # TransferClient, ClipboardSync, Discovery, KDE Connect,
+│   │   │                      # MacReceiverService (:8768), MenuBarManager
+│   │   └── Views/             # DropZone, KDE Connect, MenuBarPopover, History
 │   └── Resources/             # App icons & Entitlements
-├── android/                   # Native Android Receiver (Kotlin, Jetpack Compose)
+├── android/                   # Native Android Receiver & Sender (Kotlin, Jetpack Compose)
 │   └── app/src/main/java/com/beamdrop/receiver/
+│       ├── camera/            # CameraHelper (Continuity Camera capture)
 │       ├── model/             # TransferRecord, KdeConnectModels, PairedDevice
 │       ├── security/          # PairingManager & Keystore token storage
 │       ├── server/            # Embedded lightweight HTTP server (:8765)
-│       ├── service/           # FileReceiverForegroundService & NotificationListener
+│       ├── service/           # FileReceiverForegroundService, FileSenderManager,
+│       │                      # BeamDropNotificationListenerService
 │       ├── storage/           # Scoped Storage MediaStore Router
-│       └── ui/                # Jetpack Compose Screens (Trackpad, Media, Commands)
+│       └── ui/                # Jetpack Compose Screens (Dashboard, Trackpad, Media, Commands)
+├── dist/                      # Pre-built binaries (BeamDrop.app, BeamDrop-Receiver.apk)
 ├── website/                   # Open-source landing page
 ├── docs/                      # GitHub Pages static documentation
-└── scripts/                   # Automated build scripts
+└── scripts/                   # Automated build scripts (build_macos_app.sh)
 ```
 
 ---
 
-## 5. Building & Running the Applications
+## 7. Building & Running the Applications
 
-### 5.1 macOS Sender Application
+### 7.1 macOS Application
 
 The pre-built native application bundle is located in `dist/`:
 ```bash
@@ -123,14 +160,20 @@ bash scripts/build_macos_app.sh
 
 ---
 
-### 5.2 Android Receiver Application
+### 7.2 Android Application
 
-#### Building the APK with Gradle:
-1. Ensure `ANDROID_HOME` or your Android SDK path is exported:
+#### Pre-built APK:
+Install the ready-to-run APK directly from `dist/`:
+```bash
+adb install -r dist/BeamDrop-Receiver.apk
+```
+
+#### Rebuilding the APK with Gradle:
+1. Ensure your Android SDK path is exported:
    ```bash
    export ANDROID_HOME="$HOME/Library/Android/sdk"
    ```
-2. Navigate to the android project directory and build the debug APK:
+2. Navigate to the android directory and assemble:
    ```bash
    cd android && ./gradlew assembleDebug
    ```
@@ -139,43 +182,34 @@ bash scripts/build_macos_app.sh
    android/app/build/outputs/apk/debug/app-debug.apk
    ```
 
-#### Installing onto your Android device via USB or Wireless ADB:
-```bash
-adb install -r dist/BeamDrop-Receiver.apk
-```
-
-#### Opening in Android Studio:
-Alternatively, launch Android Studio, click **Open**, and choose the `android` folder in this repository.
-
 ---
 
-## 6. Configuring Background Receiving on Android
+## 8. Background Receiving on Android
 
 Android actively throttles background execution to conserve battery. To ensure BeamDrop stays responsive when the screen turns off or while using other apps:
 
 1. **Disable Battery Optimization**:
-   - In BeamDrop on Android, go to the **Settings** tab.
+   - In BeamDrop on Android, open **Settings**.
    - Tap **"Disable Battery Optimization"** and select **Allow** (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`).
 2. **App Battery Settings**:
    - Open device **Settings → Apps → BeamDrop → Battery**.
    - Select **Unrestricted** (prevents Android from putting the app to sleep).
-3. **Lock App in Recent Apps Screen**:
-   - Swipe up and hold to open Recent Apps.
-   - Tap the BeamDrop app icon at the top of its window card and tap **Lock**. This prevents the OS from clearing it during RAM memory pressure.
-4. **Foreground Service Ongoing Notification**:
-   - BeamDrop automatically runs an ongoing notification ("BeamDrop Active"). This signals the Android system kernel to keep the background process alive.
+3. **Lock App in Recent Apps**:
+   - Swipe up to open Recent Apps.
+   - Tap the BeamDrop app icon at the top of its window card and tap **Lock**.
+4. **Foreground Service Notification**:
+   - BeamDrop automatically displays an ongoing notification ("BeamDrop Active"). This signals the Android kernel to keep the background process alive.
 
 ---
 
-## 7. Troubleshooting Guide
+## 9. Troubleshooting & FAQ
 
-- **Mac cannot discover the Android device automatically:**
-  - Some Wi-Fi routers disable mDNS / multicast between clients (AP Isolation).
-  - Open BeamDrop on your Android device, look at the IP address shown on the dashboard (e.g. `192.168.1.45`), go to **Settings** on your Mac, enter the IP, and click **Scan / Ping**.
-- **Transfer fails or times out:**
-  - Ensure both devices are connected to the same Wi-Fi network (or MacBook is connected to Android Wi-Fi hotspot).
-  - Verify port `8765` is not blocked by local macOS firewall (`System Settings → Network → Firewall`).
+- **Devices don't discover each other on public/office Wi-Fi:**
+  - Many corporate, university, and public café networks enable **AP Isolation**, preventing connected devices from talking directly to each other.
+  - **Solution**: Turn on your Android device's **Portable Wi-Fi Hotspot** and connect your Mac to it. This provides an isolated high-speed 5GHz direct connection without router interference.
+- **Firewall blocking transfers:**
+  - Ensure local network connections on ports `8765` and `8768` are permitted (`System Settings → Network → Firewall`).
 - **Images don't appear in Gallery immediately:**
-  - BeamDrop sets `IS_PENDING = 0` and calls `MediaScannerConnection.scanFile`. Some third-party gallery apps cache thumbnails; Google Photos and native galleries will index immediately. Pull down to refresh if needed.
-- **Device stops receiving when screen turns off:**
-  - Verify battery optimization is set to **Unrestricted** under `Settings → Apps → BeamDrop → Battery` as described in Section 6.
+  - BeamDrop sets `IS_PENDING = 0` and triggers `MediaScannerConnection.scanFile`. Google Photos and native galleries will index immediately. Pull down to refresh if your gallery app caches views.
+- **Continuity camera snapshot shows permission error:**
+  - Ensure the Camera permission is granted on Android under `Settings → Apps → BeamDrop → Permissions → Camera`.
