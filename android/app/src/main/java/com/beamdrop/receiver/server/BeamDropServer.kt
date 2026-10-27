@@ -689,8 +689,21 @@ class BeamDropServer(
             return
         }
         try {
-            val jpegBytes = kotlinx.coroutines.runBlocking {
+            var jpegBytes = kotlinx.coroutines.runBlocking {
                 com.beamdrop.receiver.camera.CameraHelper.captureSnapshot(context)
+            }
+            if (jpegBytes == null) {
+                // If backgrounded, bring BeamDrop to foreground and retry
+                try {
+                    val launchIntent = Intent(context, com.beamdrop.receiver.MainActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    }
+                    context.startActivity(launchIntent)
+                    Thread.sleep(800)
+                    jpegBytes = kotlinx.coroutines.runBlocking {
+                        com.beamdrop.receiver.camera.CameraHelper.captureSnapshot(context)
+                    }
+                } catch (_: Exception) {}
             }
             if (jpegBytes != null && jpegBytes.isNotEmpty()) {
                 writeResponse(output, 200, "OK", "image/jpeg", jpegBytes)
