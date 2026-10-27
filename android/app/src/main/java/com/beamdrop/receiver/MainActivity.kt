@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.beamdrop.receiver.ui.MainViewModel
 import com.beamdrop.receiver.ui.screens.DashboardScreen
@@ -30,7 +31,9 @@ import com.beamdrop.receiver.ui.screens.MediaControlScreen
 import com.beamdrop.receiver.ui.screens.PairingScreen
 import com.beamdrop.receiver.ui.screens.PresentationScreen
 import com.beamdrop.receiver.ui.screens.RemoteCommandsScreen
+import com.beamdrop.receiver.ui.screens.SecondScreenView
 import com.beamdrop.receiver.ui.screens.SettingsScreen
+import com.beamdrop.receiver.ui.screens.SketchPadScreen
 import com.beamdrop.receiver.ui.screens.TrackpadScreen
 import com.beamdrop.receiver.ui.theme.BeamDropTheme
 
@@ -179,15 +182,19 @@ class MainActivity : ComponentActivity() {
 fun DeviceAndSettingsScreen(viewModel: MainViewModel) {
     var subTab by remember { mutableIntStateOf(0) }
     Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = subTab) {
+        ScrollableTabRow(selectedTabIndex = subTab, edgePadding = 12.dp) {
             Tab(selected = subTab == 0, onClick = { subTab = 0 }, text = { Text("Pairing & QR") })
-            Tab(selected = subTab == 1, onClick = { subTab = 1 }, text = { Text("History") })
-            Tab(selected = subTab == 2, onClick = { subTab = 2 }, text = { Text("Settings") })
+            Tab(selected = subTab == 1, onClick = { subTab = 1 }, text = { Text("✍️ Sketch Pad") })
+            Tab(selected = subTab == 2, onClick = { subTab = 2 }, text = { Text("🖥️ Sidecar Display") })
+            Tab(selected = subTab == 3, onClick = { subTab = 3 }, text = { Text("History") })
+            Tab(selected = subTab == 4, onClick = { subTab = 4 }, text = { Text("Settings") })
         }
         when (subTab) {
             0 -> PairingScreen(viewModel = viewModel)
-            1 -> HistoryScreen(viewModel = viewModel)
-            2 -> SettingsScreen(viewModel = viewModel)
+            1 -> SketchPadScreen(viewModel = viewModel)
+            2 -> SecondScreenView(viewModel = viewModel)
+            3 -> HistoryScreen(viewModel = viewModel)
+            4 -> SettingsScreen(viewModel = viewModel)
         }
     }
 }

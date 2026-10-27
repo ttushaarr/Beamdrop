@@ -230,6 +230,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         com.beamdrop.receiver.service.FileSenderManager.setLastKnownMacIp(getApplication(), ip)
     }
 
+    fun sendSketchBytesToMac(bytes: ByteArray, targetFolder: String, callback: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val mac = com.beamdrop.receiver.service.FileSenderManager.resolveTargetMac(app, _serverIp.value)
+            if (mac.isNullOrEmpty()) {
+                callback(false)
+                return@launch
+            }
+            val fileName = "Sketch_${System.currentTimeMillis()}.png"
+            val success = com.beamdrop.receiver.service.FileSenderManager.sendBytesToMac(bytes, fileName, mac, targetFolder)
+            callback(success)
+        }
+    }
+
+    fun sendScreenTouch(normX: Float, normY: Float, type: String = "click") {
+        viewModelScope.launch {
+            val mac = com.beamdrop.receiver.service.FileSenderManager.lastKnownMacIp.value ?: return@launch
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val url = java.net.URL("http://$mac:8768/api/v1/screen/touch")
+                    val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                        requestMethod = "POST"
+                        doOutput = true
+                        connectTimeout = 1000
+                        readTimeout = 1000
+                        setRequestProperty("Content-Type", "application/json")
+                    }
+                    val json = "{\"x\":$normX,\"y\":$normY,\"type\":\"$type\"}"
+                    conn.outputStream.write(json.toByteArray())
+                    conn.responseCode
+                    conn.disconnect()
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    fun unlockMacBiometric(callback: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val mac = com.beamdrop.receiver.service.FileSenderManager.resolveTargetMac(app, _serverIp.value)
+            if (mac.isNullOrEmpty()) {
+                callback(false)
+                return@launch
+            }
+            val token = pairingManager.serverAuthToken
+            val success = com.beamdrop.receiver.service.FileSenderManager.requestMacUnlock(mac, token)
+            callback(success)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         if (_isServiceBound.value) {

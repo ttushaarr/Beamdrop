@@ -62,7 +62,6 @@ public final class MacReceiverService: ObservableObject {
         var buffer = Data()
         var headersParsed = false
         var fileName = "received_file"
-        var fileSize: Int64 = 0
         var targetSubfolder = "Downloads"
         var contentLength: Int = 0
         var bodyStartIndex = 0
@@ -89,10 +88,24 @@ public final class MacReceiverService: ObservableObject {
                             
                             if let headerStr = String(data: headerData, encoding: .utf8) {
                                 let lines = headerStr.components(separatedBy: "\r\n")
-                                if let firstLine = lines.first, firstLine.hasPrefix("GET ") || firstLine.hasPrefix("HEAD ") {
-                                    if firstLine.contains("/api/v1/ping") || firstLine.contains(" / ") {
-                                        self.sendHttpResponse(connection: connection, statusCode: 200, body: "{\"status\":\"OK\",\"service\":\"MacReceiver\"}")
-                                        return
+                                if let firstLine = lines.first {
+                                    if firstLine.hasPrefix("GET ") || firstLine.hasPrefix("HEAD ") {
+                                        if firstLine.contains("/api/v1/ping") || firstLine.contains(" / ") {
+                                            self.sendHttpResponse(connection: connection, statusCode: 200, body: "{\"status\":\"OK\",\"service\":\"MacReceiver\"}")
+                                            return
+                                        } else if firstLine.contains("/api/v1/screen/frame") {
+                                            self.handleScreenFrame(connection: connection)
+                                            return
+                                        }
+                                    } else if firstLine.hasPrefix("POST ") {
+                                        if firstLine.contains("/api/v1/mac/unlock") {
+                                            self.handleMacUnlock(connection: connection)
+                                            return
+                                        } else if firstLine.contains("/api/v1/screen/touch") {
+                                            let body = buffer.count > bodyStartIndex ? buffer.subdata(in: bodyStartIndex..<buffer.count) : Data()
+                                            self.handleScreenTouch(bodyData: body, connection: connection)
+                                            return
+                                        }
                                     }
                                 }
                                 for line in lines {
@@ -100,8 +113,6 @@ public final class MacReceiverService: ObservableObject {
                                     if lower.hasPrefix("x-file-name:") {
                                         let raw = String(line.dropFirst(12)).trimmingCharacters(in: .whitespaces)
                                         fileName = raw.removingPercentEncoding ?? raw
-                                    } else if lower.hasPrefix("x-file-size:") {
-                                        fileSize = Int64(String(line.dropFirst(12)).trimmingCharacters(in: .whitespaces)) ?? 0
                                     } else if lower.hasPrefix("x-target-folder:") {
                                         targetSubfolder = String(line.dropFirst(16)).trimmingCharacters(in: .whitespaces)
                                     } else if lower.hasPrefix("content-length:") {
@@ -139,7 +150,7 @@ public final class MacReceiverService: ObservableObject {
                     self.sendHttpResponse(connection: connection, statusCode: 200, body: "{\"status\":\"SUCCESS\"}")
                     
                     if let savedURL = destinationURL {
-                        self.onFileSuccessfullyReceived(url: savedURL, fileName: fileName, fileSize: bytesWritten)
+                        self.onFileSuccessfullyReceived(url: savedURL, fileName: fileName, fileSize: bytesWritten, targetFolder: targetSubfolder)
                     }
                     return
                 }
@@ -157,10 +168,81 @@ public final class MacReceiverService: ObservableObject {
         receiveNext()
     }
     
+    private func handleScreenFrame(connection: NWConnection) {
+        guard let screen = NSScreen.main else {
+            sendHttpResponse(connection: connection, statusCode: 500, body: "{\"error\":\"No display available\"}")
+            return
+        }
+        
+        let rect = screen.frame
+        guard let cgImage = CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, [.bestResolution]) else {
+            sendHttpResponse(connection: connection, statusCode: 500, body: "{\"error\":\"Screen capture failed\"}")
+            return
+        }
+        
+        let rep = NSBitmapImageRep(cgImage: cgImage)
+        guard let jpegData = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.55]) else {
+            sendHttpResponse(connection: connection, statusCode: 500, body: "{\"error\":\"JPEG conversion failed\"}")
+            return
+        }
+        
+        let headerStr = "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: \(jpegData.count)\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n"
+        if let headerData = headerStr.data(using: .utf8) {
+            var fullData = headerData
+            fullData.append(jpegData)
+            connection.send(content: fullData, completion: .contentProcessed({ _ in
+                connection.cancel()
+            }))
+        } else {
+            connection.cancel()
+        }
+    }
+    
+    private func handleMacUnlock(connection: NWConnection) {
+        DispatchQueue.main.async {
+            let task = Process()
+            task.launchPath = "/usr/bin/caffeinate"
+            task.arguments = ["-u", "-t", "2"]
+            try? task.run()
+            
+            let script = """
+            display notification "Unlocked via Moto Pad 60 Pro Biometrics" with title "BeamDrop Biometric Unlock"
+            """
+            var err: NSDictionary?
+            NSAppleScript(source: script)?.executeAndReturnError(&err)
+            NSSound(named: "Glass")?.play()
+        }
+        sendHttpResponse(connection: connection, statusCode: 200, body: "{\"status\":\"UNLOCKED\"}")
+    }
+    
+    private func handleScreenTouch(bodyData: Data, connection: NWConnection) {
+        if let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+           let normX = json["x"] as? Double,
+           let normY = json["y"] as? Double {
+            DispatchQueue.main.async {
+                guard let screen = NSScreen.main else { return }
+                let screenW = screen.frame.width
+                let screenH = screen.frame.height
+                let targetPoint = CGPoint(x: normX * screenW, y: normY * screenH)
+                
+                CGWarpMouseCursorPosition(targetPoint)
+                
+                let clickDown = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: targetPoint, mouseButton: .left)
+                clickDown?.post(tap: .cghidEventTap)
+                let clickUp = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: targetPoint, mouseButton: .left)
+                clickUp?.post(tap: .cghidEventTap)
+            }
+        }
+        sendHttpResponse(connection: connection, statusCode: 200, body: "{\"status\":\"OK\"}")
+    }
+    
     private func resolveDestinationDirectory(subfolder: String) -> URL {
         if subfolder.localizedCaseInsensitiveContains("pictures") || subfolder.localizedCaseInsensitiveContains("camera") {
             let pics = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first!
             return pics.appendingPathComponent("BeamDrop/Camera", isDirectory: true)
+        }
+        if subfolder.localizedCaseInsensitiveContains("sketch") || subfolder.localizedCaseInsensitiveContains("desktop") {
+            return FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
         }
         let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
         return downloads.appendingPathComponent("BeamDrop", isDirectory: true)
@@ -181,7 +263,7 @@ public final class MacReceiverService: ObservableObject {
     }
     
     private func sendHttpResponse(connection: NWConnection, statusCode: Int, body: String) {
-        let resp = "HTTP/1.1 \(statusCode) OK\r\nContent-Type: application/json\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
+        let resp = "HTTP/1.1 \(statusCode) OK\r\nContent-Type: application/json\r\nContent-Length: \(body.utf8.count)\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n\(body)"
         if let data = resp.data(using: .utf8) {
             connection.send(content: data, completion: .contentProcessed({ _ in
                 connection.cancel()
@@ -191,9 +273,18 @@ public final class MacReceiverService: ObservableObject {
         }
     }
     
-    private func onFileSuccessfullyReceived(url: URL, fileName: String, fileSize: Int64) {
+    private func onFileSuccessfullyReceived(url: URL, fileName: String, fileSize: Int64, targetFolder: String) {
         DispatchQueue.main.async {
             self.lastReceivedFile = fileName
+            
+            // If sketch or clipboard, copy directly to macOS Pasteboard
+            if targetFolder.localizedCaseInsensitiveContains("clipboard") || targetFolder.localizedCaseInsensitiveContains("sketch") || fileName.localizedCaseInsensitiveContains("sketch") {
+                if let img = NSImage(contentsOf: url) {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.writeObjects([img])
+                    print("[RECEIVER] Put received sketch/image directly onto macOS pasteboard!")
+                }
+            }
             
             // Add to history
             var item = TransferItem(url: url)

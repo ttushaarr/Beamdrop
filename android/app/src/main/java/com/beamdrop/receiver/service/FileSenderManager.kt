@@ -126,6 +126,61 @@ object FileSenderManager {
         resolved
     }
 
+    suspend fun requestMacUnlock(macIp: String, token: String): Boolean = withContext(Dispatchers.IO) {
+        var connection: HttpURLConnection? = null
+        try {
+            val url = URL("http://$macIp:$MAC_RECEIVER_PORT/api/v1/mac/unlock")
+            connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = 5000
+                readTimeout = 10000
+                setRequestProperty("Authorization", "Bearer $token")
+            }
+            connection.outputStream.write("{}".toByteArray())
+            return@withContext (connection.responseCode == 200)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error requesting Mac unlock: ${e.message}")
+            return@withContext false
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    suspend fun sendBytesToMac(
+        bytes: ByteArray,
+        fileName: String,
+        macIp: String,
+        targetSubfolder: String = "Desktop"
+    ): Boolean = withContext(Dispatchers.IO) {
+        var connection: HttpURLConnection? = null
+        try {
+            val url = URL("http://$macIp:$MAC_RECEIVER_PORT/api/v1/receive")
+            connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = 6000
+                readTimeout = 30000
+                setRequestProperty("X-File-Name", URLEncoder.encode(fileName, "UTF-8"))
+                setRequestProperty("X-File-Size", bytes.size.toString())
+                setRequestProperty("X-File-Type", "image/png")
+                setRequestProperty("X-Target-Folder", targetSubfolder)
+                setFixedLengthStreamingMode(bytes.size)
+            }
+            connection.outputStream.use { os ->
+                os.write(bytes)
+                os.flush()
+            }
+            val code = connection.responseCode
+            return@withContext (code == 200)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending bytes to Mac: ${e.message}")
+            return@withContext false
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
     suspend fun sendMultipleUrisToMac(
         context: Context,
         uris: List<Uri>,

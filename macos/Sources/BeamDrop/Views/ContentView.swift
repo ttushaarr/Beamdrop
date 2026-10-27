@@ -86,12 +86,13 @@ public struct ContentView: View {
             HStack {
                 Picker("", selection: $vm.selectedTab) {
                     Label("Send File", systemImage: "arrow.up.circle.fill").tag(0)
-                    Label("KDE Connect", systemImage: "ipad.and.arrow.forward").tag(1)
-                    Label("History", systemImage: "clock.fill").tag(2)
-                    Label("Settings", systemImage: "gearshape.fill").tag(3)
+                    Label("Remote Files", systemImage: "folder.fill").tag(1)
+                    Label("KDE Connect", systemImage: "ipad.and.arrow.forward").tag(2)
+                    Label("History", systemImage: "clock.fill").tag(3)
+                    Label("Settings", systemImage: "gearshape.fill").tag(4)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 440)
+                .frame(width: 540)
                 
                 Spacer()
                 
@@ -118,8 +119,10 @@ public struct ContentView: View {
                     if vm.selectedTab == 0 {
                         sendTab
                     } else if vm.selectedTab == 1 {
-                        KdeConnectView()
+                        RemoteFileBrowserView()
                     } else if vm.selectedTab == 2 {
+                        KdeConnectView()
+                    } else if vm.selectedTab == 3 {
                         TransferHistoryView()
                     } else {
                         SettingsView()

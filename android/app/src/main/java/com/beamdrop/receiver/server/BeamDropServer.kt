@@ -6,7 +6,9 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Environment
 import android.os.StatFs
+import android.provider.Settings
 import android.util.Log
+import android.webkit.MimeTypeMap
 import com.beamdrop.receiver.model.ActiveTransferState
 import com.beamdrop.receiver.model.InitTransferRequest
 import com.beamdrop.receiver.model.MediaActionPayload
@@ -19,11 +21,14 @@ import com.beamdrop.receiver.storage.StorageResolver
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileInputStream
 import java.io.FilterInputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.URLDecoder
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -266,6 +271,21 @@ class BeamDropServer(
                 }
                 method == "GET" && path == "/api/v1/camera/snapshot" -> {
                     handleCameraSnapshot(output, headers)
+                }
+                method == "GET" && path == "/api/v1/files/list" -> {
+                    handleFilesList(output, headers, queryString)
+                }
+                method == "GET" && path == "/api/v1/files/download" -> {
+                    handleFileDownload(output, headers, queryString)
+                }
+                method == "POST" && path == "/api/v1/hotspot/toggle" -> {
+                    handleHotspotToggle(output, headers)
+                }
+                method == "GET" && path == "/api/v1/hotspot/status" -> {
+                    handleHotspotStatus(output, headers)
+                }
+                method == "POST" && path == "/api/v1/audio/play" -> {
+                    handleAudioPlay(output, headers)
                 }
                 method == "POST" && path == "/api/v1/unpair" -> {
                     handleUnpair(input, output, headers)
@@ -713,6 +733,137 @@ class BeamDropServer(
         } catch (e: Exception) {
             Log.e(TAG, "Camera snapshot error: ${e.message}")
             writeResponse(output, 500, "Internal Server Error", "application/json", "{\"error\":\"${e.message}\"}".toByteArray())
+        }
+    }
+
+    private fun handleFilesList(output: OutputStream, headers: Map<String, String>, queryString: String) {
+        if (!pairingManager.isAuthorized(headers["authorization"])) {
+            writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Unauthorized\"}".toByteArray())
+            return
+        }
+
+        var folderParam = ""
+        queryString.split("&").forEach { param ->
+            if (param.startsWith("folder=")) {
+                folderParam = URLDecoder.decode(param.substring(7), "UTF-8")
+            }
+        }
+
+        val targetDir = if (folderParam.isNotEmpty()) {
+            File(Environment.getExternalStorageDirectory(), folderParam)
+        } else {
+            Environment.getExternalStorageDirectory()
+        }
+
+        val jsonArray = JSONArray()
+        if (targetDir.exists() && targetDir.isDirectory) {
+            val files = targetDir.listFiles()?.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
+            files?.take(100)?.forEach { file ->
+                val obj = JSONObject().apply {
+                    put("name", file.name)
+                    put("path", file.absolutePath.removePrefix(Environment.getExternalStorageDirectory().absolutePath).trimStart('/'))
+                    put("isDirectory", file.isDirectory)
+                    put("size", if (file.isDirectory) 0 else file.length())
+                    put("lastModified", file.lastModified())
+                    if (!file.isDirectory) {
+                        val ext = file.extension.lowercase()
+                        val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"
+                        put("mimeType", mime)
+                    }
+                }
+                jsonArray.put(obj)
+            }
+        }
+
+        val resp = JSONObject().apply {
+            put("currentFolder", folderParam)
+            put("files", jsonArray)
+        }
+        writeJsonResponse(output, 200, "OK", resp)
+    }
+
+    private fun handleFileDownload(output: OutputStream, headers: Map<String, String>, queryString: String) {
+        if (!pairingManager.isAuthorized(headers["authorization"])) {
+            writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Unauthorized\"}".toByteArray())
+            return
+        }
+
+        var pathParam = ""
+        queryString.split("&").forEach { param ->
+            if (param.startsWith("path=")) {
+                pathParam = URLDecoder.decode(param.substring(5), "UTF-8")
+            }
+        }
+
+        val file = File(Environment.getExternalStorageDirectory(), pathParam)
+        if (!file.exists() || file.isDirectory) {
+            writeResponse(output, 404, "Not Found", "application/json", "{\"error\":\"File not found\"}".toByteArray())
+            return
+        }
+
+        val ext = file.extension.lowercase()
+        val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"
+        val header = "HTTP/1.1 200 OK\r\n" +
+                "Content-Type: $mime\r\n" +
+                "Content-Length: ${file.length()}\r\n" +
+                "Content-Disposition: attachment; filename=\"${file.name}\"\r\n" +
+                "Access-Control-Allow-Origin: *\r\n" +
+                "Connection: close\r\n\r\n"
+        output.write(header.toByteArray(Charsets.US_ASCII))
+
+        FileInputStream(file).use { fis ->
+            val buf = ByteArray(65536)
+            var read: Int
+            while (fis.read(buf).also { read = it } != -1) {
+                output.write(buf, 0, read)
+            }
+        }
+        output.flush()
+    }
+
+    private fun handleHotspotToggle(output: OutputStream, headers: Map<String, String>) {
+        if (!pairingManager.isAuthorized(headers["authorization"])) {
+            writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Unauthorized\"}".toByteArray())
+            return
+        }
+        try {
+            val intent = Intent().apply {
+                action = Settings.ACTION_WIRELESS_SETTINGS
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+            writeJsonResponse(output, 200, "OK", JSONObject().apply {
+                put("status", "SUCCESS")
+                put("message", "Opened Hotspot & Tethering Settings on tablet")
+            })
+        } catch (e: Exception) {
+            writeResponse(output, 500, "Error", "application/json", "{\"error\":\"${e.message}\"}".toByteArray())
+        }
+    }
+
+    private fun handleHotspotStatus(output: OutputStream, headers: Map<String, String>) {
+        val resp = JSONObject().apply {
+            put("hotspotName", "BeamDrop-Hotspot")
+            put("frequency", "5GHz")
+            put("supportsInstantHotspot", true)
+        }
+        writeJsonResponse(output, 200, "OK", resp)
+    }
+
+    private fun handleAudioPlay(output: OutputStream, headers: Map<String, String>) {
+        if (!pairingManager.isAuthorized(headers["authorization"])) {
+            writeResponse(output, 401, "Unauthorized", "application/json", "{\"error\":\"Unauthorized\"}".toByteArray())
+            return
+        }
+        try {
+            val tone = android.media.RingtoneManager.getRingtone(
+                context,
+                android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+            )
+            tone?.play()
+            writeJsonResponse(output, 200, "OK", JSONObject().apply { put("status", "PLAYING") })
+        } catch (e: Exception) {
+            writeResponse(output, 500, "Error", "application/json", "{\"error\":\"${e.message}\"}".toByteArray())
         }
     }
 

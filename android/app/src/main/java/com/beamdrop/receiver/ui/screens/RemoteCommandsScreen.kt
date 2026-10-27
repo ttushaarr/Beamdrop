@@ -33,6 +33,7 @@ fun RemoteCommandsScreen(viewModel: MainViewModel) {
     val commands = remember {
         listOf(
             CommandUI("lock_screen", "Lock Mac", "Lock screen immediately", Icons.Default.Lock),
+            CommandUI("unlock_mac", "Unlock Mac", "Biometric Mac unlock", Icons.Default.Fingerprint),
             CommandUI("sleep", "Sleep Mac", "Put MacBook to sleep", Icons.Default.Bedtime),
             CommandUI("screenshot", "Screenshot", "Save to Mac Desktop", Icons.Default.CameraAlt),
             CommandUI("mute", "Mute Audio", "Toggle system sound", Icons.Default.VolumeMute),
@@ -92,6 +93,10 @@ fun RemoteCommandsScreen(viewModel: MainViewModel) {
                         } else if (cmd.id == "ring_mac") {
                             viewModel.sendRingMac()
                             lastTriggered = "Ring MacBook"
+                        } else if (cmd.id == "unlock_mac") {
+                            viewModel.unlockMacBiometric { ok ->
+                                lastTriggered = if (ok) "Mac Unlocked via Biometric" else "Unlock request failed"
+                            }
                         } else {
                             viewModel.sendRemoteCommand(cmd.id)
                             lastTriggered = cmd.title
