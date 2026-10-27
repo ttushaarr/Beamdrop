@@ -27,8 +27,9 @@
 | 🔔 **Find My Device Ringing** | Ring Android device with max volume alarm + vibration from Mac, or ring Mac loudly from Android. | ✅ Bi-dir | ✅ Bi-dir |
 | 🔋 **Bidirectional Battery** | Real-time battery percentage and charging indicator (⚡) visible on both devices. | ✅ Bi-dir | ✅ Bi-dir |
 | 📂 **Remote File Browser** | Browse, explore, and download files stored on your Android device from a native Finder view on macOS. | ✅ Client | ✅ Server |
+| 📸 **Mac Screenshot Shortcut** | Hit `Cmd + Shift + D` (or `Cmd + Option + S` / Menu Bar) to instantly capture your Mac screen and beam it straight to your tablet's gallery (`Pictures/LaptopTransfer/`). | ✅ Global Hotkey | ✅ Auto-Gallery |
 | ✍️ **Continuity Sketch Pad** | Draw, sketch, or sign on your tablet with finger/stylus and insert directly onto Mac Desktop or Mac Pasteboard (`Cmd+V`). | ✅ Receiver | ✅ Canvas |
-| 🖥️ **Wireless Second Screen** | Stream your MacBook screen to your Android tablet with ultra-low latency and interactive touch clicks (Sidecar mode). | ✅ Streamer | ✅ Viewer |
+| 🖥️ **Wireless Second Screen** | Stream your MacBook screen to your Android tablet at 30+ FPS low latency with interactive touch clicks (Sidecar mode). | ✅ Streamer | ✅ Viewer |
 | 🔐 **Biometric Mac Unlock** | Unlock your MacBook wirelessly using your Android tablet's fingerprint sensor. | ✅ Receiver | ✅ Auth |
 | 📶 **Instant Hotspot & Audio** | Trigger Android hotspot tethering and wireless audio relay between devices with a single tap. | ✅ Bi-dir | ✅ Bi-dir |
 | 🌐 **Dynamic Wi-Fi Discovery** | Works across home Wi-Fi, office/campus subnets (`10.x`, `192.168.x`), and mobile hotspots without manual IP entry. | ✅ Bi-dir | ✅ Bi-dir |
@@ -103,6 +104,12 @@ Incoming files on Android are routed dynamically based on MIME type and extensio
 
 ### Duplicate File Protection
 BeamDrop **never silently overwrites** existing files on either macOS or Android. If `report.pdf` already exists, incoming files are automatically renamed to `report (1).pdf`, `report (2).pdf`, preserving the original extension and data.
+
+### 📸 Instant Mac Screenshot Shortcut (`⌘⇧D` / `⌘⌥S`)
+- Press **`Cmd + Shift + D`** (or **`Cmd + Option + S`**) from anywhere on your Mac to instantly capture your display.
+- Alternatively, click the Menu Bar paperplane icon → **"Send Screenshot to Tablet (⌘⇧D)"**.
+- The screenshot is immediately transferred to your Android tablet and indexed into **`Pictures/LaptopTransfer/`**.
+- It shows up immediately in your Android Gallery / Google Photos app and triggers a notification on the tablet with zero latency.
 
 ---
 

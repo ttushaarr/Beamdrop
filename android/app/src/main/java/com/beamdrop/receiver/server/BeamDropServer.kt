@@ -198,6 +198,8 @@ class BeamDropServer(
 
     private fun handleClient(socket: Socket) {
         var isSseConnection = false
+        var streamInput: InputStream? = null
+        val headers = mutableMapOf<String, String>()
         try {
             socket.tcpNoDelay = true
             val remoteIp = socket.inetAddress?.hostAddress
@@ -206,6 +208,7 @@ class BeamDropServer(
             }
 
             val input = socket.getInputStream()
+            streamInput = input
             val output = socket.getOutputStream()
 
             // 1. Read Request Line
@@ -219,7 +222,6 @@ class BeamDropServer(
             val queryString = if (fullUri.contains('?')) fullUri.substringAfter('?') else ""
 
             // 2. Read Headers
-            val headers = mutableMapOf<String, String>()
             while (true) {
                 val headerLine = readLine(input) ?: break
                 if (headerLine.isEmpty()) break
@@ -299,6 +301,12 @@ class BeamDropServer(
         } finally {
             if (!isSseConnection) {
                 try {
+                    // Drain any remaining unread bytes from socket input to avoid TCP RST
+                    val cl = headers["content-length"]?.toIntOrNull() ?: 0
+                    if (cl > 0 && streamInput != null) {
+                        val available = streamInput.available()
+                        if (available > 0) streamInput.skip(available.toLong())
+                    }
                     socket.close()
                 } catch (_: Exception) {}
             }

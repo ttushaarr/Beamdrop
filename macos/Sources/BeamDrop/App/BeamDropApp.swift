@@ -15,6 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardSyncService.shared.startMonitoringMacPasteboard()
         ClipboardSyncService.shared.startSseConnection()
         KdeConnectService.shared.start()
+        ScreenshotShortcutManager.shared.start()
     }
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -30,6 +31,7 @@ struct BeamDropApp: App {
         _ = DeviceDiscoveryService.shared
         _ = ClipboardSyncService.shared
         _ = KdeConnectService.shared
+        _ = ScreenshotShortcutManager.shared
     }
     
     var body: some Scene {
@@ -40,6 +42,12 @@ struct BeamDropApp: App {
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            CommandMenu("Actions") {
+                Button("Send Screenshot to Tablet") {
+                    ScreenshotShortcutManager.shared.captureAndSendScreenshot()
+                }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+            }
         }
     }
 }

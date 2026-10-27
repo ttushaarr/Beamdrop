@@ -45,8 +45,8 @@ fun SecondScreenView(viewModel: MainViewModel) {
                 try {
                     val url = URL("http://$targetMacIp:8768/api/v1/screen/frame")
                     val conn = (url.openConnection() as HttpURLConnection).apply {
-                        connectTimeout = 1500
-                        readTimeout = 2000
+                        connectTimeout = 2500
+                        readTimeout = 3000
                     }
                     if (conn.responseCode == 200) {
                         val bytes = conn.inputStream.use { it.readBytes() }

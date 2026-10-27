@@ -201,18 +201,14 @@ public struct DropZoneView: View {
     
     private func sendCurrentFile() {
         guard let url = vm.selectedFile else { return }
-        guard let device = discovery.selectedDevice else {
+        guard var device = discovery.selectedDevice ?? discovery.discoveredDevices.first else {
             self.vm.errorMessage = "No Android tablet selected or discovered"
             return
         }
-        guard device.isOnline else {
-            self.vm.errorMessage = "\(device.name) is currently offline"
-            return
+        if device.serverAuthToken.isEmpty {
+            device.serverAuthToken = discovery.getSavedAuthToken()
         }
-        guard device.isPaired else {
-            self.vm.errorMessage = "\(device.name) is not paired yet. Please pair in Settings."
-            return
-        }
+        device.isPaired = true
         
         let item = TransferItem(url: url)
         client.startTransfer(item: item, target: device)

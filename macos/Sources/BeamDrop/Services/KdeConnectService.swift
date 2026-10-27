@@ -36,8 +36,7 @@ public final class KdeConnectService: ObservableObject {
     }
     
     private func getActiveToken() -> String {
-        let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? .standard
-        return prefs.string(forKey: "paired_token") ?? fallbackToken
+        return DeviceDiscoveryService.shared.getSavedAuthToken()
     }
     
     private func getTargetHost() -> String {

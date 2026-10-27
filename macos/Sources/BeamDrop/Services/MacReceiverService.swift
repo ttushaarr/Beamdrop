@@ -175,13 +175,14 @@ public final class MacReceiverService: ObservableObject {
         }
         
         let rect = screen.frame
-        guard let cgImage = CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, [.bestResolution]) else {
+        // Use nominal resolution and optimal compression for 30+ FPS low-latency streaming
+        guard let cgImage = CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, [.nominalResolution]) else {
             sendHttpResponse(connection: connection, statusCode: 500, body: "{\"error\":\"Screen capture failed\"}")
             return
         }
         
         let rep = NSBitmapImageRep(cgImage: cgImage)
-        guard let jpegData = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.55]) else {
+        guard let jpegData = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.45]) else {
             sendHttpResponse(connection: connection, statusCode: 500, body: "{\"error\":\"JPEG conversion failed\"}")
             return
         }
@@ -223,7 +224,8 @@ public final class MacReceiverService: ObservableObject {
                 guard let screen = NSScreen.main else { return }
                 let screenW = screen.frame.width
                 let screenH = screen.frame.height
-                let targetPoint = CGPoint(x: normX * screenW, y: normY * screenH)
+                // Invert Y coordinate because macOS screen origin (0,0) is bottom-left while touch is top-left
+                let targetPoint = CGPoint(x: normX * screenW, y: (1.0 - normY) * screenH)
                 
                 CGWarpMouseCursorPosition(targetPoint)
                 

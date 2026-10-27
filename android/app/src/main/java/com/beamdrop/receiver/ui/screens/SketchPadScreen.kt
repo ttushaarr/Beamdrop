@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.beamdrop.receiver.ui.MainViewModel
@@ -47,6 +49,7 @@ fun SketchPadScreen(viewModel: MainViewModel) {
     var strokeWidth by remember { mutableFloatStateOf(6f) }
     var sketchStatus by remember { mutableStateOf<String?>(null) }
     var isSending by remember { mutableStateOf(false) }
+    var canvasSize by remember { mutableStateOf(IntSize(1280, 800)) }
 
     val colors = listOf(
         Color(0xFF000000), // Black
@@ -181,7 +184,15 @@ fun SketchPadScreen(viewModel: MainViewModel) {
                         )
                     }
             ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .onGloballyPositioned { coordinates ->
+                            if (coordinates.size.width > 0 && coordinates.size.height > 0) {
+                                canvasSize = coordinates.size
+                            }
+                        }
+                ) {
                     // Draw committed paths
                     paths.forEach { dp ->
                         drawPath(
@@ -234,7 +245,7 @@ fun SketchPadScreen(viewModel: MainViewModel) {
                     if (paths.isNotEmpty()) {
                         isSending = true
                         sketchStatus = "Sending to Mac Desktop..."
-                        val pngBytes = exportPathsToPng(paths, 1280, 800)
+                        val pngBytes = exportPathsToPng(paths, canvasSize.width, canvasSize.height)
                         viewModel.sendSketchBytesToMac(pngBytes, "Desktop") { success ->
                             isSending = false
                             sketchStatus = if (success) "✓ Saved to MacBook Desktop!" else "Failed to send to Mac"
@@ -255,7 +266,7 @@ fun SketchPadScreen(viewModel: MainViewModel) {
                     if (paths.isNotEmpty()) {
                         isSending = true
                         sketchStatus = "Copying to Mac Pasteboard..."
-                        val pngBytes = exportPathsToPng(paths, 1280, 800)
+                        val pngBytes = exportPathsToPng(paths, canvasSize.width, canvasSize.height)
                         viewModel.sendSketchBytesToMac(pngBytes, "Clipboard") { success ->
                             isSending = false
                             sketchStatus = if (success) "✓ Copied to Mac Clipboard (Cmd+V)!" else "Failed to copy to Mac"

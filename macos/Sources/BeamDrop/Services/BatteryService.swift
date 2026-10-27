@@ -20,8 +20,9 @@ public final class BatteryService: ObservableObject {
                 self?.refreshMacBattery()
                 let host = DeviceDiscoveryService.shared.selectedDevice?.host ?? targetHost
                 let currentPort = DeviceDiscoveryService.shared.selectedDevice?.port ?? port
+                let activeToken = DeviceDiscoveryService.shared.getSavedAuthToken()
                 if let battery = self?.macBattery {
-                    await self?.pushMacBatteryToTablet(battery, host: host, port: currentPort, token: token)
+                    await self?.pushMacBatteryToTablet(battery, host: host, port: currentPort, token: activeToken)
                 }
                 try? await Task.sleep(nanoseconds: 30 * 1_000_000_000) // Every 30 seconds
             }

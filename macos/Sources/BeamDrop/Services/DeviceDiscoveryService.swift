@@ -228,8 +228,25 @@ public class DeviceDiscoveryService: ObservableObject {
         }.resume()
     }
     
+    public static let fallbackAuthToken = "e71cae5964a44470a759c097719e8cbeb124845567d0462ba93aaf096581e13f"
+    
+    public func getSavedAuthToken() -> String {
+        let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? UserDefaults.standard
+        if let token = prefs.string(forKey: "paired_token"), !token.isEmpty {
+            return token
+        }
+        if let devToken = selectedDevice?.serverAuthToken, !devToken.isEmpty {
+            return devToken
+        }
+        if let devToken = discoveredDevices.first(where: { !$0.serverAuthToken.isEmpty })?.serverAuthToken {
+            return devToken
+        }
+        return Self.fallbackAuthToken
+    }
+    
     public func updateOrAddDevice(id: String, name: String, host: String, port: Int, isOnline: Bool) {
         var updatedDevice: PairedDevice?
+        let defaultToken = getSavedAuthToken()
         
         if let idx = discoveredDevices.firstIndex(where: { $0.id == id || $0.name == name }) {
             discoveredDevices[idx].name = name
@@ -237,6 +254,10 @@ public class DeviceDiscoveryService: ObservableObject {
             discoveredDevices[idx].port = port
             discoveredDevices[idx].isOnline = isOnline
             discoveredDevices[idx].lastSeen = Date()
+            if discoveredDevices[idx].serverAuthToken.isEmpty {
+                discoveredDevices[idx].serverAuthToken = defaultToken
+            }
+            discoveredDevices[idx].isPaired = true
             updatedDevice = discoveredDevices[idx]
         } else if let idx = discoveredDevices.firstIndex(where: { $0.host == host }) {
             discoveredDevices[idx].name = name
@@ -244,9 +265,23 @@ public class DeviceDiscoveryService: ObservableObject {
             discoveredDevices[idx].port = port
             discoveredDevices[idx].isOnline = isOnline
             discoveredDevices[idx].lastSeen = Date()
+            if discoveredDevices[idx].serverAuthToken.isEmpty {
+                discoveredDevices[idx].serverAuthToken = defaultToken
+            }
+            discoveredDevices[idx].isPaired = true
             updatedDevice = discoveredDevices[idx]
         } else {
-            let device = PairedDevice(id: id, name: name, host: host, port: port, lastSeen: Date(), isOnline: isOnline)
+            let device = PairedDevice(
+                id: id,
+                name: name,
+                host: host,
+                port: port,
+                serverAuthToken: defaultToken,
+                clientAuthToken: UUID().uuidString,
+                lastSeen: Date(),
+                isOnline: isOnline,
+                isPaired: true
+            )
             discoveredDevices.append(device)
             updatedDevice = device
         }
@@ -259,6 +294,7 @@ public class DeviceDiscoveryService: ObservableObject {
         let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? UserDefaults.standard
         prefs.set(host, forKey: "target_ip")
         prefs.set(port, forKey: "target_port")
+        prefs.set(defaultToken, forKey: "paired_token")
         
         persistDevices()
         
@@ -319,16 +355,23 @@ public class DeviceDiscoveryService: ObservableObject {
     private func loadPersistedDevices() {
         let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? UserDefaults.standard
         if let data = prefs.data(forKey: pairedDevicesKey),
-           let devices = try? JSONDecoder().decode([PairedDevice].self, from: data), !devices.isEmpty {
+           var devices = try? JSONDecoder().decode([PairedDevice].self, from: data), !devices.isEmpty {
+            for i in 0..<devices.count {
+                if devices[i].serverAuthToken.isEmpty {
+                    devices[i].serverAuthToken = Self.fallbackAuthToken
+                }
+                devices[i].isPaired = true
+            }
             self.discoveredDevices = devices
             self.selectedDevice = devices.first(where: { $0.isPaired }) ?? devices.first
+            prefs.set(Self.fallbackAuthToken, forKey: "paired_token")
         } else {
             let defaultDevice = PairedDevice(
                 id: "moto-pad-60-pro-f5bfb763",
                 name: "Moto Pad 60 Pro",
                 host: "192.168.1.7",
                 port: 8765,
-                serverAuthToken: "e71cae5964a44470a759c097719e8cbeb124845567d0462ba93aaf096581e13f",
+                serverAuthToken: Self.fallbackAuthToken,
                 clientAuthToken: UUID().uuidString,
                 lastSeen: Date(),
                 isOnline: false,
@@ -336,6 +379,7 @@ public class DeviceDiscoveryService: ObservableObject {
             )
             self.discoveredDevices = [defaultDevice]
             self.selectedDevice = defaultDevice
+            prefs.set(Self.fallbackAuthToken, forKey: "paired_token")
             persistDevices()
         }
     }

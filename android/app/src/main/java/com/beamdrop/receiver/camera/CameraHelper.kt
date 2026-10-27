@@ -10,6 +10,7 @@ import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
+import android.util.Size
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
@@ -18,7 +19,7 @@ object CameraHelper {
     private const val TAG = "CameraHelper"
 
     @SuppressLint("MissingPermission")
-    suspend fun captureSnapshot(context: Context): ByteArray? = withTimeoutOrNull(6000) {
+    suspend fun captureSnapshot(context: Context): ByteArray? = withTimeoutOrNull(7000) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             Log.e(TAG, "Camera permission not granted")
             return@withTimeoutOrNull null
@@ -33,16 +34,39 @@ object CameraHelper {
             return@withTimeoutOrNull null
         }
 
-        // Find back-facing camera or fallback to first
-        var targetCameraId = cameraIdList[0]
-        for (id in cameraIdList) {
-            val chars = cameraManager.getCameraCharacteristics(id)
-            val facing = chars.get(CameraCharacteristics.LENS_FACING)
-            if (facing == CameraCharacteristics.LENS_FACING_BACK) {
-                targetCameraId = id
-                break
+        // Try back-facing camera first, then fallback to any available camera
+        val sortedCameraIds = cameraIdList.sortedByDescending { id ->
+            val chars = try { cameraManager.getCameraCharacteristics(id) } catch (_: Exception) { null }
+            val facing = chars?.get(CameraCharacteristics.LENS_FACING)
+            if (facing == CameraCharacteristics.LENS_FACING_BACK) 2 else 1
+        }
+
+        for (targetCameraId in sortedCameraIds) {
+            val result = captureFromCameraId(cameraManager, targetCameraId)
+            if (result != null && result.isNotEmpty()) {
+                return@withTimeoutOrNull result
             }
         }
+        null
+    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun captureFromCameraId(cameraManager: CameraManager, targetCameraId: String): ByteArray? {
+        val chars = try {
+            cameraManager.getCameraCharacteristics(targetCameraId)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get characteristics for camera $targetCameraId: ${e.message}")
+            return null
+        }
+
+        val map = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+        val jpegSizes = map?.getOutputSizes(ImageFormat.JPEG) ?: emptyArray()
+        val chosenSize = jpegSizes.firstOrNull { it.width == 1280 && it.height == 720 }
+            ?: jpegSizes.firstOrNull { it.width <= 1920 && it.height <= 1080 }
+            ?: jpegSizes.firstOrNull()
+            ?: Size(1280, 720)
+
+        Log.i(TAG, "Selected camera $targetCameraId resolution: ${chosenSize.width}x${chosenSize.height}")
 
         val thread = HandlerThread("CameraBackground").apply { start() }
         val handler = Handler(thread.looper)
@@ -67,9 +91,7 @@ object CameraHelper {
         }
 
         try {
-            val width = 1280
-            val height = 720
-            val reader = ImageReader.newInstance(width, height, ImageFormat.JPEG, 2)
+            val reader = ImageReader.newInstance(chosenSize.width, chosenSize.height, ImageFormat.JPEG, 2)
             imageReader = reader
 
             reader.setOnImageAvailableListener({ ir ->
@@ -82,16 +104,18 @@ object CameraHelper {
                             val bytes = ByteArray(buffer.remaining())
                             buffer.get(bytes)
                             image.close()
-                            Log.i(TAG, "Captured snapshot frame of size ${bytes.size} bytes")
-                            deferredResult.complete(bytes)
+                            Log.i(TAG, "Successfully captured frame of size ${bytes.size} bytes from camera $targetCameraId")
+                            if (!deferredResult.isCompleted) {
+                                deferredResult.complete(bytes)
+                            }
                             return@setOnImageAvailableListener
                         }
                         image.close()
                     }
-                    deferredResult.complete(null)
+                    if (!deferredResult.isCompleted) deferredResult.complete(null)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error acquiring image: ${e.message}")
-                    deferredResult.complete(null)
+                    if (!deferredResult.isCompleted) deferredResult.complete(null)
                 }
             }, handler)
 
@@ -106,52 +130,52 @@ object CameraHelper {
                                 override fun onConfigured(session: CameraCaptureSession) {
                                     captureSession = session
                                     try {
-                                        val captureBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE).apply {
+                                        // Use TEMPLATE_PREVIEW for universal hardware compatibility without 3A still lockups
+                                        val captureBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
                                             addTarget(surface)
-                                            set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
-                                            set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                                            set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
                                         }
                                         session.capture(captureBuilder.build(), null, handler)
-                                        Log.i(TAG, "Capture request dispatched")
+                                        Log.i(TAG, "Capture request dispatched to camera $targetCameraId")
                                     } catch (e: Exception) {
                                         Log.e(TAG, "Failed to dispatch capture request: ${e.message}")
-                                        deferredResult.complete(null)
+                                        if (!deferredResult.isCompleted) deferredResult.complete(null)
                                     }
                                 }
 
                                 override fun onConfigureFailed(session: CameraCaptureSession) {
-                                    Log.e(TAG, "Session configuration failed")
-                                    deferredResult.complete(null)
+                                    Log.e(TAG, "Session configuration failed for camera $targetCameraId")
+                                    if (!deferredResult.isCompleted) deferredResult.complete(null)
                                 }
                             },
                             handler
                         )
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to create capture session: ${e.message}")
-                        deferredResult.complete(null)
+                        if (!deferredResult.isCompleted) deferredResult.complete(null)
                     }
                 }
 
                 override fun onDisconnected(camera: CameraDevice) {
-                    Log.w(TAG, "Camera disconnected")
+                    Log.w(TAG, "Camera $targetCameraId disconnected")
                     camera.close()
-                    deferredResult.complete(null)
+                    if (!deferredResult.isCompleted) deferredResult.complete(null)
                 }
 
                 override fun onError(camera: CameraDevice, error: Int) {
-                    Log.e(TAG, "Camera device error: $error")
+                    Log.e(TAG, "Camera $targetCameraId error: $error")
                     camera.close()
-                    deferredResult.complete(null)
+                    if (!deferredResult.isCompleted) deferredResult.complete(null)
                 }
             }, handler)
 
             val result = deferredResult.await()
             cleanup()
-            return@withTimeoutOrNull result
+            return result
         } catch (e: Exception) {
-            Log.e(TAG, "Exception during captureSnapshot: ${e.message}")
+            Log.e(TAG, "Exception during captureSnapshot on camera $targetCameraId: ${e.message}")
             cleanup()
-            return@withTimeoutOrNull null
+            return null
         }
     }
 }

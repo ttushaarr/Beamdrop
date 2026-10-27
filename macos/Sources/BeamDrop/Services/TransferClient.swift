@@ -91,11 +91,13 @@ public class TransferClient: NSObject, ObservableObject, URLSessionTaskDelegate 
                     throw NSError(domain: "BeamDrop", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid target device URL"])
                 }
                 
+                let authToken = !target.serverAuthToken.isEmpty ? target.serverAuthToken : DeviceDiscoveryService.shared.getSavedAuthToken()
+                
                 // 2. Transfer Init handshake
                 let initURL = baseURL.appendingPathComponent("/api/v1/transfer/init")
                 var initRequest = URLRequest(url: initURL)
                 initRequest.httpMethod = "POST"
-                initRequest.setValue("Bearer \(target.serverAuthToken)", forHTTPHeaderField: "Authorization")
+                initRequest.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
                 initRequest.setValue(target.clientAuthToken, forHTTPHeaderField: "X-BeamDrop-Sender-Id")
                 initRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 
@@ -145,7 +147,7 @@ public class TransferClient: NSObject, ObservableObject, URLSessionTaskDelegate 
                 
                 var uploadRequest = URLRequest(url: uploadComponents.url!)
                 uploadRequest.httpMethod = "POST"
-                uploadRequest.setValue("Bearer \(target.serverAuthToken)", forHTTPHeaderField: "Authorization")
+                uploadRequest.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
                 uploadRequest.setValue(target.clientAuthToken, forHTTPHeaderField: "X-BeamDrop-Sender-Id")
                 uploadRequest.setValue("\(transfer.fileSize)", forHTTPHeaderField: "Content-Length")
                 uploadRequest.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")

@@ -149,6 +149,17 @@ public struct MenuBarPopoverView: View {
             // Quick Actions
             VStack(spacing: 6) {
                 Button(action: {
+                    ScreenshotShortcutManager.shared.captureAndSendScreenshot()
+                }) {
+                    HStack {
+                        Image(systemName: "camera.viewfinder").foregroundColor(.purple)
+                        Text("Send Screenshot to Tablet (⌘⇧D)")
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.plain)
+                
+                Button(action: {
                     selectAndSendFile()
                 }) {
                     HStack {
