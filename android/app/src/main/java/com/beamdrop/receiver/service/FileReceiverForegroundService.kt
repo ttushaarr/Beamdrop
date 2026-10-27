@@ -335,6 +335,7 @@ class FileReceiverForegroundService : Service() {
     }
 
     fun handleIncomingAiQuestion(file: File, fileName: String) {
+        Log.i(TAG, "🤖 handleIncomingAiQuestion received: $fileName, path: ${file.absolutePath}, size: ${file.length()}")
         val questionItem = AiQuestionItem(
             imagePath = file.absolutePath,
             fileName = fileName,
@@ -345,7 +346,9 @@ class FileReceiverForegroundService : Service() {
         updateNotification("🤖 Solving Question with Gemini...", fileName)
 
         CoroutineScope(Dispatchers.IO).launch {
+            Log.i(TAG, "🤖 Calling geminiApiService.solveQuestionFromImage...")
             val result = geminiApiService.solveQuestionFromImage(file)
+            Log.i(TAG, "🤖 Gemini result: success=${result.success}, error=${result.errorMessage}")
             withContext(Dispatchers.Main) {
                 _isAiSolving.value = false
                 val updated = questionItem.copy(
@@ -370,11 +373,13 @@ class FileReceiverForegroundService : Service() {
     fun retryAiSolve(item: AiQuestionItem) {
         val file = File(item.imagePath)
         if (!file.exists()) return
+        Log.i(TAG, "🤖 retryAiSolve triggered for ${item.fileName}")
         _isAiSolving.value = true
         _currentAiQuestion.value = item.copy(isSolving = true, errorMessage = null)
 
         CoroutineScope(Dispatchers.IO).launch {
             val result = geminiApiService.solveQuestionFromImage(file)
+            Log.i(TAG, "🤖 retryAiSolve result: success=${result.success}, error=${result.errorMessage}")
             withContext(Dispatchers.Main) {
                 _isAiSolving.value = false
                 val updated = item.copy(
@@ -383,6 +388,14 @@ class FileReceiverForegroundService : Service() {
                     errorMessage = result.errorMessage
                 )
                 _currentAiQuestion.value = updated
+                val history = _aiQuestionHistory.value.toMutableList()
+                val idx = history.indexOfFirst { it.id == item.id }
+                if (idx >= 0) {
+                    history[idx] = updated
+                } else {
+                    history.add(0, updated)
+                }
+                _aiQuestionHistory.value = history
             }
         }
     }

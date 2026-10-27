@@ -18,7 +18,14 @@ class GeminiApiService(private val context: Context) {
         private const val TAG = "GeminiApiService"
         private const val PREFS_NAME = "beamdrop_ai_prefs"
         private const val KEY_GEMINI_API_KEY = "gemini_api_key"
-        private const val DEFAULT_MODEL = "gemini-1.5-flash"
+        val CANDIDATE_MODELS = listOf(
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash",
+            "gemini-2.5-flash",
+            "gemini-flash-latest",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash"
+        )
     }
 
     fun getApiKey(): String {
@@ -103,62 +110,74 @@ Format your response cleanly in GitHub Markdown using this structure:
                 put("generationConfig", genConfig)
             }
 
-            val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$DEFAULT_MODEL:generateContent?key=$apiKey"
-            val url = URL(endpoint)
-            val conn = url.openConnection() as HttpURLConnection
-            conn.requestMethod = "POST"
-            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-            conn.doOutput = true
-            conn.doInput = true
-            conn.connectTimeout = 30000
-            conn.readTimeout = 45000
+            var lastErrorMessage = "Unable to connect to Gemini API."
 
-            OutputStreamWriter(conn.outputStream, "UTF-8").use { writer ->
-                writer.write(requestJson.toString())
-                writer.flush()
-            }
+            // Try candidate models in order of speed and availability
+            for (model in CANDIDATE_MODELS) {
+                try {
+                    val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+                    val url = URL(endpoint)
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.requestMethod = "POST"
+                    conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                    conn.doOutput = true
+                    conn.doInput = true
+                    conn.connectTimeout = 15000
+                    conn.readTimeout = 30000
 
-            val code = conn.responseCode
-            if (code == 200) {
-                val body = conn.inputStream.bufferedReader().use { it.readText() }
-                val respJson = JSONObject(body)
-                val candidates = respJson.optJSONArray("candidates")
-                if (candidates != null && candidates.length() > 0) {
-                    val candidate = candidates.getJSONObject(0)
-                    val content = candidate.optJSONObject("content")
-                    val partsArr = content?.optJSONArray("parts")
-                    if (partsArr != null && partsArr.length() > 0) {
-                        val text = partsArr.getJSONObject(0).optString("text", "")
-                        return@withContext AiSolveResult(
-                            success = true,
-                            solutionText = text
-                        )
+                    OutputStreamWriter(conn.outputStream, "UTF-8").use { writer ->
+                        writer.write(requestJson.toString())
+                        writer.flush()
                     }
+
+                    val code = conn.responseCode
+                    if (code == 200) {
+                        val body = conn.inputStream.bufferedReader().use { it.readText() }
+                        val respJson = JSONObject(body)
+                        val candidates = respJson.optJSONArray("candidates")
+                        if (candidates != null && candidates.length() > 0) {
+                            val candidate = candidates.getJSONObject(0)
+                            val content = candidate.optJSONObject("content")
+                            val partsArr = content?.optJSONArray("parts")
+                            if (partsArr != null && partsArr.length() > 0) {
+                                val text = partsArr.getJSONObject(0).optString("text", "")
+                                return@withContext AiSolveResult(
+                                    success = true,
+                                    solutionText = text
+                                )
+                            }
+                        }
+                    } else if (code == 404 || code == 503 || code == 429) {
+                        // Model not available or high demand; automatically fall back to next candidate model
+                        Log.w(TAG, "Model $model returned HTTP $code, attempting next candidate...")
+                        continue
+                    } else {
+                        val errBody = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+                        val message = try {
+                            val errJson = JSONObject(errBody)
+                            errJson.optJSONObject("error")?.optString("message") ?: errBody
+                        } catch (_: Exception) {
+                            errBody
+                        }
+                        Log.e(TAG, "Gemini model $model failed with HTTP $code: $message")
+                        lastErrorMessage = "Gemini Error ($code): $message"
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error connecting with model $model: ${e.message}")
+                    lastErrorMessage = "Network error: ${e.localizedMessage ?: e.message}"
                 }
-                return@withContext AiSolveResult(
-                    success = false,
-                    errorMessage = "Gemini returned an empty response. Please try again."
-                )
-            } else {
-                val errBody = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
-                val message = try {
-                    val errJson = JSONObject(errBody)
-                    errJson.optJSONObject("error")?.optString("message") ?: errBody
-                } catch (_: Exception) {
-                    errBody
-                }
-                Log.e(TAG, "Gemini API failed with HTTP $code: $message")
-                return@withContext AiSolveResult(
-                    success = false,
-                    errorMessage = "Gemini Error ($code): $message"
-                )
             }
+
+            return@withContext AiSolveResult(
+                success = false,
+                errorMessage = lastErrorMessage
+            )
 
         } catch (e: Exception) {
             Log.e(TAG, "Exception calling Gemini API: ${e.message}", e)
             return@withContext AiSolveResult(
                 success = false,
-                errorMessage = "Network or connection error: ${e.localizedMessage ?: e.message}"
+                errorMessage = "Error: ${e.localizedMessage ?: e.message}"
             )
         }
     }
