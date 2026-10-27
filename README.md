@@ -26,6 +26,11 @@
 | ⚙️ **One-Tap System Commands** | Lock screen, sleep, take desktop screenshot, mute, empty trash, launch Terminal, and open URLs. | ✅ Server | ✅ Client |
 | 🔔 **Find My Device Ringing** | Ring Android device with max volume alarm + vibration from Mac, or ring Mac loudly from Android. | ✅ Bi-dir | ✅ Bi-dir |
 | 🔋 **Bidirectional Battery** | Real-time battery percentage and charging indicator (⚡) visible on both devices. | ✅ Bi-dir | ✅ Bi-dir |
+| 📂 **Remote File Browser** | Browse, explore, and download files stored on your Android device from a native Finder view on macOS. | ✅ Client | ✅ Server |
+| ✍️ **Continuity Sketch Pad** | Draw, sketch, or sign on your tablet with finger/stylus and insert directly onto Mac Desktop or Mac Pasteboard (`Cmd+V`). | ✅ Receiver | ✅ Canvas |
+| 🖥️ **Wireless Second Screen** | Stream your MacBook screen to your Android tablet with ultra-low latency and interactive touch clicks (Sidecar mode). | ✅ Streamer | ✅ Viewer |
+| 🔐 **Biometric Mac Unlock** | Unlock your MacBook wirelessly using your Android tablet's fingerprint sensor. | ✅ Receiver | ✅ Auth |
+| 📶 **Instant Hotspot & Audio** | Trigger Android hotspot tethering and wireless audio relay between devices with a single tap. | ✅ Bi-dir | ✅ Bi-dir |
 | 🌐 **Dynamic Wi-Fi Discovery** | Works across home Wi-Fi, office/campus subnets (`10.x`, `192.168.x`), and mobile hotspots without manual IP entry. | ✅ Bi-dir | ✅ Bi-dir |
 
 ---
