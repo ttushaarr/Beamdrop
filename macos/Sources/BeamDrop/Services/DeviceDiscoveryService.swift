@@ -51,13 +51,117 @@ public class DeviceDiscoveryService: ObservableObject {
                             &hostname, socklen_t(hostname.count),
                             nil, 0, NI_NUMERICHOST)
                 let ip = String(cString: hostname)
-                let parts = ip.split(separator: ".")
+                let parts = ip.split(separator: ".").compactMap { Int($0) }
                 if parts.count == 4 && ip != "127.0.0.1" {
                     prefixes.insert("\(parts[0]).\(parts[1]).\(parts[2]).")
+                    
+                    if let netmaskPtr = ptr.pointee.ifa_netmask {
+                        var maskCopy = netmaskPtr.pointee
+                        var maskHostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                        getnameinfo(&maskCopy, socklen_t(maskCopy.sa_len),
+                                    &maskHostname, socklen_t(maskHostname.count),
+                                    nil, 0, NI_NUMERICHOST)
+                        let maskParts = String(cString: maskHostname).split(separator: ".").compactMap { Int($0) }
+                        if maskParts.count == 4 && maskParts[2] < 255 {
+                            let thirdByte = parts[2]
+                            let maskThird = maskParts[2]
+                            let startThird = thirdByte & maskThird
+                            let endThird = min(startThird + (255 - maskThird), startThird + 15)
+                            for t in startThird...endThird {
+                                prefixes.insert("\(parts[0]).\(parts[1]).\(t).")
+                            }
+                        }
+                    }
                 }
             }
         }
         return Array(prefixes)
+    }
+
+    public static func getArpNeighborIps() -> [String] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/arp")
+        process.arguments = ["-an"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let output = String(data: data, encoding: .utf8) {
+                let pattern = #"\((([0-9]{1,3}\.){3}[0-9]{1,3})\)"#
+                if let regex = try? NSRegularExpression(pattern: pattern) {
+                    let nsOutput = output as NSString
+                    let matches = regex.matches(in: output, range: NSRange(location: 0, length: nsOutput.length))
+                    return matches.map { nsOutput.substring(with: $0.range(at: 1)) }
+                }
+            }
+        } catch {}
+        return []
+    }
+
+    public func probeAndAddHost(_ host: String, session: URLSession? = nil) {
+        guard let url = URL(string: "http://\(host):8765/api/v1/ping") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.timeoutInterval = 0.8
+        
+        let activeSession = session ?? URLSession.shared
+        activeSession.dataTask(with: req) { [weak self] data, response, error in
+            guard let self = self, let data = data, error == nil,
+                  let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
+            
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let deviceId = json["deviceId"] as? String {
+                let name = (json["deviceName"] as? String) ?? "Android Device"
+                DispatchQueue.main.async {
+                    self.updateOrAddDevice(id: deviceId, name: name, host: host, port: 8765, isOnline: true)
+                    print("[DISCOVERY] Found BeamDrop at \(host):8765 (\(name))")
+                }
+            }
+        }.resume()
+    }
+
+    public func probeAdbDevices() {
+        guard let adbPath = AdbService.findAdbPath() else { return }
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: adbPath)
+            p.arguments = ["devices"]
+            let pipe = Pipe()
+            p.standardOutput = pipe
+            try? p.run()
+            p.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let out = String(data: data, encoding: .utf8) ?? ""
+            for line in out.components(separatedBy: "\n").dropFirst() {
+                let parts = line.split(separator: "\t")
+                if parts.count >= 2, parts[1].trimmingCharacters(in: .whitespaces) == "device" {
+                    let serial = String(parts[0])
+                    let ipProc = Process()
+                    ipProc.executableURL = URL(fileURLWithPath: adbPath)
+                    ipProc.arguments = ["-s", serial, "shell", "ip", "route"]
+                    let ipPipe = Pipe()
+                    ipProc.standardOutput = ipPipe
+                    try? ipProc.run()
+                    ipProc.waitUntilExit()
+                    let ipData = ipPipe.fileHandleForReading.readDataToEndOfFile()
+                    let ipOut = String(data: ipData, encoding: .utf8) ?? ""
+                    if let match = ipOut.range(of: #"src (([0-9]{1,3}\.){3}[0-9]{1,3})"#, options: .regularExpression) {
+                        let ip = String(ipOut[match]).replacingOccurrences(of: "src ", with: "").trimmingCharacters(in: .whitespaces)
+                        if !ip.isEmpty {
+                            DispatchQueue.main.async {
+                                self?.probeAndAddHost(ip)
+                            }
+                        }
+                    }
+                    let fwdProc = Process()
+                    fwdProc.executableURL = URL(fileURLWithPath: adbPath)
+                    fwdProc.arguments = ["-s", serial, "forward", "tcp:8765", "tcp:8765"]
+                    try? fwdProc.run()
+                }
+            }
+        }
     }
     
     public func scanActiveSubnets() {
@@ -74,37 +178,29 @@ public class DeviceDiscoveryService: ObservableObject {
         config.timeoutIntervalForResource = 0.8
         let scanSession = URLSession(configuration: config)
         
+        // 1. Immediately probe ARP neighbors (fastest 50ms lookup)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let arpIps = Self.getArpNeighborIps()
+            for ip in arpIps {
+                self?.probeAndAddHost(ip, session: scanSession)
+            }
+        }
+        
+        // 2. Query ADB devices and auto-forward port 8765
+        probeAdbDevices()
+        
+        // 3. Sweep all active subnet blocks
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             
             for prefix in prefixes {
                 for i in 1...254 {
                     let host = "\(prefix)\(i)"
-                    guard let url = URL(string: "http://\(host):8765/api/v1/ping") else { continue }
-                    
-                    var req = URLRequest(url: url)
-                    req.httpMethod = "GET"
-                    
-                    scanSession.dataTask(with: req) { data, response, error in
-                        guard let data = data, error == nil,
-                              let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                            return
-                        }
-                        
-                        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                           let deviceId = json["deviceId"] as? String {
-                            let name = (json["deviceName"] as? String) ?? "Android Device"
-                            DispatchQueue.main.async {
-                                self.updateOrAddDevice(id: deviceId, name: name, host: host, port: 8765, isOnline: true)
-                                print("[DISCOVERY] Found BeamDrop on new network at \(host):8765 (\(name))")
-                            }
-                        }
-                    }.resume()
+                    self.probeAndAddHost(host, session: scanSession)
                 }
             }
             
-            // Turn off searching spinner after sweep
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 self.isSearching = false
             }
         }

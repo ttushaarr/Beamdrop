@@ -2,6 +2,8 @@ import SwiftUI
 
 public struct DeviceStatusView: View {
     @ObservedObject var discovery = DeviceDiscoveryService.shared
+    @State private var showPopover: Bool = false
+    @State private var manualIp: String = ""
     
     public init() {}
     
@@ -47,6 +49,84 @@ public struct DeviceStatusView: View {
             }
             
             Spacer()
+            
+            Button(action: { showPopover.toggle() }) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Configure Target IP / Network")
+            .popover(isPresented: $showPopover) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Target Device Connection")
+                        .font(.system(size: 13, weight: .bold))
+                    
+                    Text("Enter the IP address shown at the top of the BeamDrop Android app screen:")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    
+                    HStack(spacing: 8) {
+                        TextField("e.g. 10.102.8.250", text: $manualIp)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 12, design: .monospaced))
+                        
+                        Button("Connect") {
+                            let ip = manualIp.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !ip.isEmpty {
+                                discovery.probeAndAddHost(ip)
+                                showPopover = false
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(manualIp.isEmpty)
+                    }
+                    
+                    if !discovery.discoveredDevices.isEmpty {
+                        Divider()
+                        Text("Discovered Devices:")
+                            .font(.system(size: 11, weight: .semibold))
+                        ForEach(discovery.discoveredDevices) { dev in
+                            Button(action: {
+                                discovery.selectedDevice = dev
+                                manualIp = dev.host
+                                discovery.probeAndAddHost(dev.host)
+                                showPopover = false
+                            }) {
+                                HStack {
+                                    Circle().fill(dev.isOnline ? Color.green : Color.gray).frame(width: 8, height: 8)
+                                    Text("\(dev.name) (\(dev.host))")
+                                        .font(.system(size: 11))
+                                    Spacer()
+                                    if discovery.selectedDevice?.host == dev.host {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    Button(action: {
+                        discovery.scanActiveSubnets()
+                    }) {
+                        HStack {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Full Subnet & ARP Sweep")
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .padding(14)
+                .frame(width: 300)
+                .onAppear {
+                    manualIp = discovery.selectedDevice?.host ?? UserDefaults(suiteName: "com.beamdrop.BeamDrop")?.string(forKey: "target_ip") ?? ""
+                }
+            }
             
             Button(action: { discovery.scanActiveSubnets() }) {
                 if discovery.isSearching {
