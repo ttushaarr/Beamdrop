@@ -32,7 +32,8 @@ public class DeviceDiscoveryService: ObservableObject {
     // MARK: - Dynamic Active Subnet Detection
     
     public static func getActiveSubnetPrefixes() -> [String] {
-        var prefixes: Set<String> = []
+        var orderedPrefixes: [String] = []
+        var seen: Set<String> = []
         var ifaddr: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&ifaddr) == 0, let firstAddr = ifaddr else { return [] }
         defer { freeifaddrs(ifaddr) }
@@ -53,7 +54,11 @@ public class DeviceDiscoveryService: ObservableObject {
                 let ip = String(cString: hostname)
                 let parts = ip.split(separator: ".").compactMap { Int($0) }
                 if parts.count == 4 && ip != "127.0.0.1" {
-                    prefixes.insert("\(parts[0]).\(parts[1]).\(parts[2]).")
+                    let directPrefix = "\(parts[0]).\(parts[1]).\(parts[2])."
+                    if !seen.contains(directPrefix) {
+                        seen.insert(directPrefix)
+                        orderedPrefixes.append(directPrefix)
+                    }
                     
                     if let netmaskPtr = ptr.pointee.ifa_netmask {
                         var maskCopy = netmaskPtr.pointee
@@ -68,14 +73,18 @@ public class DeviceDiscoveryService: ObservableObject {
                             let startThird = thirdByte & maskThird
                             let endThird = min(startThird + (255 - maskThird), startThird + 15)
                             for t in startThird...endThird {
-                                prefixes.insert("\(parts[0]).\(parts[1]).\(t).")
+                                let p = "\(parts[0]).\(parts[1]).\(t)."
+                                if !seen.contains(p) {
+                                    seen.insert(p)
+                                    orderedPrefixes.append(p)
+                                }
                             }
                         }
                     }
                 }
             }
         }
-        return Array(prefixes)
+        return orderedPrefixes
     }
 
     public static func getArpNeighborIps() -> [String] {
@@ -174,14 +183,20 @@ public class DeviceDiscoveryService: ObservableObject {
         DispatchQueue.main.async { self.isSearching = true }
         
         let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 0.8
-        config.timeoutIntervalForResource = 0.8
+        config.timeoutIntervalForRequest = 0.6
+        config.timeoutIntervalForResource = 0.6
         let scanSession = URLSession(configuration: config)
         
-        // 1. Immediately probe ARP neighbors (fastest 50ms lookup)
+        // 0. Immediately probe saved target IP if available
+        let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? UserDefaults.standard
+        if let savedIp = prefs.string(forKey: "target_ip"), !savedIp.isEmpty {
+            probeAndAddHost(savedIp, session: scanSession)
+        }
+        
+        // 1. Immediately probe ARP neighbors (fastest lookup, capped to avoid socket flood)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let arpIps = Self.getArpNeighborIps()
-            for ip in arpIps {
+            for ip in arpIps.prefix(80) {
                 self?.probeAndAddHost(ip, session: scanSession)
             }
         }
@@ -189,7 +204,7 @@ public class DeviceDiscoveryService: ObservableObject {
         // 2. Query ADB devices and auto-forward port 8765
         probeAdbDevices()
         
-        // 3. Sweep all active subnet blocks
+        // 3. Sweep all active subnet blocks (primary block first)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             
@@ -411,11 +426,22 @@ public class DeviceDiscoveryService: ObservableObject {
         }
     }
     
+    private var consecutiveOfflinePings: Int = 0
+
     private func startPeriodicPing() {
-        pingTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        pingTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             for device in self.discoveredDevices {
                 self.checkDevice(host: device.host, port: device.port, hintName: device.name)
+            }
+            if self.selectedDevice == nil || self.selectedDevice?.isOnline == false {
+                self.consecutiveOfflinePings += 1
+                if self.consecutiveOfflinePings >= 2 {
+                    self.consecutiveOfflinePings = 0
+                    self.scanActiveSubnets()
+                }
+            } else {
+                self.consecutiveOfflinePings = 0
             }
         }
     }
@@ -451,11 +477,15 @@ public class DeviceDiscoveryService: ObservableObject {
     
     private func loadPersistedDevices() {
         let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? UserDefaults.standard
+        let savedIp = prefs.string(forKey: "target_ip")
         if let data = prefs.data(forKey: pairedDevicesKey),
            var devices = try? JSONDecoder().decode([PairedDevice].self, from: data), !devices.isEmpty {
             for i in 0..<devices.count {
                 if devices[i].serverAuthToken.isEmpty {
                     devices[i].serverAuthToken = Self.fallbackAuthToken
+                }
+                if let ip = savedIp, !ip.isEmpty, devices[i].host.hasPrefix("192.168.1.") || !ip.isEmpty {
+                    devices[i].host = ip
                 }
                 devices[i].isPaired = true
             }
