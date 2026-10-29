@@ -133,6 +133,10 @@ public struct ContentView: View {
         }
         .frame(minWidth: 640, minHeight: 540)
         .onAppear {
+            if let win = NSApp.windows.first(where: { $0.canBecomeMain }) {
+                AppDelegate.mainWindow = win
+                win.isReleasedWhenClosed = false
+            }
             ClipboardSyncService.shared.startMonitoringMacPasteboard()
             ClipboardSyncService.shared.startSseConnection()
             KdeConnectService.shared.start()

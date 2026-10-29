@@ -49,7 +49,7 @@ public struct WebcamStreamViewer: View {
     @State private var copied: Bool = false
     @State private var isFrontCamera: Bool = false
     @State private var isTorchOn: Bool = false
-    @State private var useDirectFrames: Bool = false
+    @State private var useDirectFrames: Bool = true
     @State private var reloadKey: UUID = UUID()
     
     public init(streamURL: URL) {

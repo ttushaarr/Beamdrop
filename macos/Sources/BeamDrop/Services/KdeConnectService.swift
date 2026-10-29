@@ -44,8 +44,9 @@ public final class KdeConnectService: ObservableObject {
         if let dev = DeviceDiscoveryService.shared.selectedDevice, !dev.host.isEmpty {
             return dev.host
         }
-        let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? .standard
-        return prefs.string(forKey: "target_ip") ?? defaultHost
+        return UserDefaults.standard.string(forKey: "target_ip")
+            ?? UserDefaults(suiteName: "com.beamdrop.BeamDrop")?.string(forKey: "target_ip")
+            ?? defaultHost
     }
     
     private func getTargetPort() -> Int {

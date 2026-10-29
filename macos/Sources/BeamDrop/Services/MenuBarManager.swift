@@ -203,10 +203,7 @@ public struct MenuBarPopoverView: View {
             // Bottom Bar
             HStack {
                 Button("Open App Window") {
-                    NSApp.activate(ignoringOtherApps: true)
-                    if let window = NSApp.windows.first {
-                        window.makeKeyAndOrderFront(nil)
-                    }
+                    (NSApp.delegate as? AppDelegate)?.showMainWindow()
                 }
                 .font(.system(size: 10))
                 

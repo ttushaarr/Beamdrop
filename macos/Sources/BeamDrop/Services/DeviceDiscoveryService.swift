@@ -188,8 +188,9 @@ public class DeviceDiscoveryService: ObservableObject {
         let scanSession = URLSession(configuration: config)
         
         // 0. Immediately probe saved target IP if available
-        let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? UserDefaults.standard
-        if let savedIp = prefs.string(forKey: "target_ip"), !savedIp.isEmpty {
+        let savedIp = UserDefaults.standard.string(forKey: "target_ip")
+            ?? UserDefaults(suiteName: "com.beamdrop.BeamDrop")?.string(forKey: "target_ip")
+        if let savedIp = savedIp, !savedIp.isEmpty {
             probeAndAddHost(savedIp, session: scanSession)
         }
         
@@ -403,10 +404,13 @@ public class DeviceDiscoveryService: ObservableObject {
         }
         
         // Persist updated IP to preferences
-        let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? UserDefaults.standard
+        let prefs = UserDefaults.standard
         prefs.set(host, forKey: "target_ip")
         prefs.set(port, forKey: "target_port")
         prefs.set(defaultToken, forKey: "paired_token")
+        UserDefaults(suiteName: "com.beamdrop.BeamDrop")?.set(host, forKey: "target_ip")
+        UserDefaults(suiteName: "com.beamdrop.BeamDrop")?.set(port, forKey: "target_port")
+        UserDefaults(suiteName: "com.beamdrop.BeamDrop")?.set(defaultToken, forKey: "paired_token")
         
         persistDevices()
         
@@ -469,16 +473,20 @@ public class DeviceDiscoveryService: ObservableObject {
     }
     
     private func persistDevices() {
-        let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? UserDefaults.standard
+        let prefs = UserDefaults.standard
         if let data = try? JSONEncoder().encode(discoveredDevices) {
             prefs.set(data, forKey: pairedDevicesKey)
+            UserDefaults(suiteName: "com.beamdrop.BeamDrop")?.set(data, forKey: pairedDevicesKey)
         }
     }
     
     private func loadPersistedDevices() {
-        let prefs = UserDefaults(suiteName: "com.beamdrop.BeamDrop") ?? UserDefaults.standard
+        let prefs = UserDefaults.standard
         let savedIp = prefs.string(forKey: "target_ip")
-        if let data = prefs.data(forKey: pairedDevicesKey),
+            ?? UserDefaults(suiteName: "com.beamdrop.BeamDrop")?.string(forKey: "target_ip")
+        let data = prefs.data(forKey: pairedDevicesKey)
+            ?? UserDefaults(suiteName: "com.beamdrop.BeamDrop")?.data(forKey: pairedDevicesKey)
+        if let data = data,
            var devices = try? JSONDecoder().decode([PairedDevice].self, from: data), !devices.isEmpty {
             for i in 0..<devices.count {
                 if devices[i].serverAuthToken.isEmpty {
