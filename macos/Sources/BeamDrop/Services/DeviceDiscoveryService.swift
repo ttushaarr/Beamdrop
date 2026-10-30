@@ -98,11 +98,27 @@ public class DeviceDiscoveryService: ObservableObject {
             process.waitUntilExit()
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             if let output = String(data: data, encoding: .utf8) {
-                let pattern = #"\((([0-9]{1,3}\.){3}[0-9]{1,3})\)"#
+                // Match ONLY active hosts with real MAC address (filter out "(incomplete)" and broadcast)
+                let pattern = #"\((([0-9]{1,3}\.){3}[0-9]{1,3})\)\s+at\s+((?:[0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2})"#
                 if let regex = try? NSRegularExpression(pattern: pattern) {
                     let nsOutput = output as NSString
                     let matches = regex.matches(in: output, range: NSRange(location: 0, length: nsOutput.length))
-                    return matches.map { nsOutput.substring(with: $0.range(at: 1)) }
+                    let validIps = matches.compactMap { match -> String? in
+                        let ip = nsOutput.substring(with: match.range(at: 1))
+                        let mac = nsOutput.substring(with: match.range(at: 3)).lowercased()
+                        if mac == "ff:ff:ff:ff:ff:ff" { return nil }
+                        return ip
+                    }
+                    
+                    // Sort: prioritize IPs matching our primary subnet prefix
+                    let activePrefixes = getActiveSubnetPrefixes()
+                    let primaryPrefix = activePrefixes.first ?? ""
+                    return validIps.sorted { ip1, ip2 in
+                        let m1 = !primaryPrefix.isEmpty && ip1.hasPrefix(primaryPrefix)
+                        let m2 = !primaryPrefix.isEmpty && ip2.hasPrefix(primaryPrefix)
+                        if m1 != m2 { return m1 && !m2 }
+                        return ip1 < ip2
+                    }
                 }
             }
         } catch {}
@@ -194,10 +210,10 @@ public class DeviceDiscoveryService: ObservableObject {
             probeAndAddHost(savedIp, session: scanSession)
         }
         
-        // 1. Immediately probe ARP neighbors (fastest lookup, capped to avoid socket flood)
+        // 1. Immediately probe verified ARP neighbors (now filtered to active devices only)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let arpIps = Self.getArpNeighborIps()
-            for ip in arpIps.prefix(80) {
+            for ip in arpIps {
                 self?.probeAndAddHost(ip, session: scanSession)
             }
         }
@@ -205,7 +221,7 @@ public class DeviceDiscoveryService: ObservableObject {
         // 2. Query ADB devices and auto-forward port 8765
         probeAdbDevices()
         
-        // 3. Sweep all active subnet blocks (primary block first)
+        // 3. Sweep active subnet blocks in small batches to preserve socket pool
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             
@@ -213,10 +229,13 @@ public class DeviceDiscoveryService: ObservableObject {
                 for i in 1...254 {
                     let host = "\(prefix)\(i)"
                     self.probeAndAddHost(host, session: scanSession)
+                    if i % 32 == 0 {
+                        Thread.sleep(forTimeInterval: 0.05)
+                    }
                 }
             }
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 self.isSearching = false
             }
         }
